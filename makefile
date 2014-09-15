@@ -114,3 +114,24 @@ src/out: | src
 src/out/libchaps.so: build_libchrome build_libchromeos src_includes src_platform2 | src/out
 	cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos" OUT=$(OUTDIR) $(MAKE)
 
+######################################
+# Clean
+clean: clean_chaps clean_chromeos clean_chromebase
+clean_chromebase: src/Sconstruct.libchrome
+	-cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchrome -c
+clean_chromeos: src/Sconstruct.libchromeos
+	-cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchromeos -c
+clean_chaps:
+	-cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I $(SRCDIR)" OUT=$(OUTDIR) VERBOSE=1 $(MAKE) clean
+	rm -rf $(OUTDIR)
+
+######################################
+# Distclean: remove source
+distclean: clean distclean_platform2 distclean_chromebase
+	rm -f src/.sconsign.dblite
+	rm -rf src
+distclean_chromebase:
+	rm -rf src/base
+distclean_platform2:
+	rm -rf src/platform2
+
