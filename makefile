@@ -130,10 +130,10 @@ distclean:
 ######################################
 # Source tarball
 SRC_TARBALL=chaps-$(CHAPS_VERSION).tar.gz
-tarball: src/$(SRC_TARBALL)
+dist: src/$(SRC_TARBALL)
 
 src/$(SRC_TARBALL): $(SRC_BUILDFILES) src_includes src_makefiles src_chromebase src_platform2
-	cd src && tar --exclude-vcs --dereference -czf $(SRC_TARBALL) base platform2/chaps platform2/libchromeos/chromeos include gmock-$(GMOCK_VERSION) $(BUILDFILES)
+	cd src && tar --transform "s,^,chaps-$(CHAPS_VERSION)/," --exclude-vcs --dereference -czf $(SRC_TARBALL) base platform2/chaps platform2/libchromeos/chromeos include gmock-$(GMOCK_VERSION) $(BUILDFILES)
 clean_tarball:
 	rm -f src/$(SRC_TARBALL)
 
