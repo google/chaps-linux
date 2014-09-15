@@ -16,12 +16,12 @@ Build Instructions
 
 At the top level of this repository, run `make`.  This will:
 
- - Create a source tree under `src/`.
- - Download the relevant ChromiumOS and Chromium code under `src/`.
+ - Create a source tree under `chaps-<version>/`.
+ - Download the relevant ChromiumOS and Chromium code under `chaps-<version>/`.
  - Copy additional files needed for the Linux build.
- - Build the code into binaries in `src/out/`, via libraries:
-     - `src/libchrome-$(BASE_VER).a`: Chromium utility code
-     - `src/libchromeos-$(BASE_VER).a`: ChromiumOS utility code
+ - Build the code into binaries in `chaps-<version>/out/`, via libraries:
+     - `chaps-<version>/libchrome-$(BASE_VER).a`: Chromium utility code
+     - `chaps-<version>/libchromeos-$(BASE_VER).a`: ChromiumOS utility code
 
 
 Repository Layout
@@ -40,9 +40,10 @@ Source Code Layout
 ------------------
 
 Executing the master `makefile` will retrieve additional source code from various upstream locations, and will place it
-under `src/`.
+under `chaps-<version>/`.
 
- - `src/base`: Chromium base library code from https://chromium.googlesource.com/chromium/src/base.git
- - `src/platform2`: ChromiumOS core code, including Chaps and utility libraries required by Chaps, from
+ - `chaps-<version>/base`: Chromium base library code from https://chromium.googlesource.com/chromium/src/base.git
+ - `chaps-<version>/platform2`: ChromiumOS core code, including Chaps and utility libraries required by Chaps, from
    https://chromium.googlesource.com/chromiumos/platform2
- - `src/include`: Local include files
+ - `chaps-<version>/include`: Local include files
+ - `chaps-<version>/debian`: Local Debian packaging files
