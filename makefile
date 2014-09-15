@@ -13,7 +13,7 @@ all: build
 
 ######################################
 # Generate a source tree under src/
-src_generate: src_includes src_makefiles src_chromebase src_platform2
+src_generate: src_includes src_makefiles src_gmock src_chromebase src_platform2
 src:
 	mkdir -p $@
 
@@ -54,6 +54,20 @@ src/Sconstruct.libchrome: extrasrc/Sconstruct.libchrome | src
 	cp $< $@
 src/Sconstruct.libchromeos: extrasrc/Sconstruct.libchromeos | src
 	cp $< $@
+
+
+# Various parts of Chromium include gTest files.  To ensure consistency, get a local
+# copy of gMock and gTest (rather than picking up whatever version is installed).
+GMOCK_VERSION=1.7.0
+GMOCK_URL=https://googlemock.googlecode.com/files/gmock-$(GMOCK_VERSION).zip
+GMOCK_DIR=$(CURDIR)/src/gmock-$(GMOCK_VERSION)
+GTEST_DIR=$(GMOCK_DIR)/gtest
+src_gmock: | $(GMOCK_DIR)
+src/gmock-$(GMOCK_VERSION).zip: | src
+	cd src && wget $(GMOCK_URL)
+$(GMOCK_DIR): src/gmock-$(GMOCK_VERSION).zip
+	cd src && unzip -q gmock-$(GMOCK_VERSION).zip
+
 
 # Chaps relies on utility code from Chromium base libraries, at:
 CHROMEBASE_GIT=https://chromium.googlesource.com/chromium/src/base.git
@@ -100,7 +114,7 @@ build: build_chaps
 # To build required Chromium components, defer to scons file.
 build_libchrome: src/libchrome-$(CHROMEBASE_VER).a
 src/libchrome-$(CHROMEBASE_VER).a: src_chromebase src_includes src/Sconstruct.libchrome
-	cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchrome
+	cd src && BASE_VER=$(CHROMEBASE_VER) GTEST_DIR=$(GTEST_DIR) scons -f Sconstruct.libchrome
 
 # To build required ChromiumOS components, defer to scons file.
 build_libchromeos: src/libchromeos-$(CHROMEBASE_VER).a
@@ -112,11 +126,13 @@ build_chaps: src/out/libchaps.so
 src/out: | src
 	mkdir -p $@
 src/out/libchaps.so: build_libchrome build_libchromeos src_includes src_platform2 | src/out
-	cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos" OUT=$(OUTDIR) $(MAKE)
+	cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST_DIR)/include" OUT=$(OUTDIR) $(MAKE)
 
 ######################################
 # Clean
-clean: clean_chaps clean_chromeos clean_chromebase
+clean: clean_chaps clean_chromeos clean_chromebase clean_gmock
+clean_gmock:
+	rm -rf $(GMOCK_DIR)/lib
 clean_chromebase: src/Sconstruct.libchrome
 	-cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchrome -c
 clean_chromeos: src/Sconstruct.libchromeos
@@ -127,9 +143,11 @@ clean_chaps:
 
 ######################################
 # Distclean: remove source
-distclean: clean distclean_platform2 distclean_chromebase
+distclean: clean distclean_platform2 distclean_chromebase distclean_gmock
 	rm -f src/.sconsign.dblite
 	rm -rf src
+distclean_gmock:
+	rm -rf $(GMOCK_DIR)
 distclean_chromebase:
 	rm -rf src/base
 distclean_platform2:

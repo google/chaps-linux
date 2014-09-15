@@ -106,6 +106,7 @@ base_lib = {
 env = Environment()
 
 BASE_VER = os.environ.get('BASE_VER', '0')
+GTEST_DIR = os.environ.get('GTEST_DIR', '0')
 PKG_CONFIG = os.environ.get('PKG_CONFIG', 'pkg-config')
 PWD = Dir('.').srcnode().abspath
 
@@ -128,6 +129,7 @@ env['CCFLAGS'] += ['-fPIC',
                    '-DUSE_AURA=1',
                    '-DUSE_SYSTEM_LIBEVENT=1',
                    '-DBASE_VER=%s' % BASE_VER,
+                   '-isystem', '%s/include' % GTEST_DIR,
                    '-Iinclude',
                    '-I.']
 
