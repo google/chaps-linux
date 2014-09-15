@@ -3,6 +3,10 @@ CHAPS_VERSION=0.1
 DEB_REVISION=1
 DEB_VERSION=$(CHAPS_VERSION)-$(DEB_REVISION)
 
+# The following should match platform2/chaps/Makefile $BASE_VER
+CHROMEBASE_VER=293518
+GMOCK_VERSION=1.7.0
+
 # Absolute location of the src/ source tree
 SRCDIR=$(CURDIR)/src
 # Output from Chaps build.
@@ -47,9 +51,11 @@ src/include/testing/gtest/include/gtest/gtest_prod.h: extrasrc/gtest_prod.h | sr
 
 
 # Copy across some build files from the build directory into src/
-src_makefiles: src/Makefile src/Sconstruct.libchrome src/Sconstruct.libchromeos
+BUILDFILES=Makefile Sconstruct.libchrome Sconstruct.libchromeos
+SRC_BUILDFILES=$(addprefix src/, $(BUILDFILES))
+src_makefiles: $(SRC_BUILDFILES)
 src/Makefile: extrasrc/Makefile | src
-	cp $< $@
+	sed 's/@BASE_VER@/$(CHROMEBASE_VER)/' $< | sed 's/@GMOCK_VER@/$(GMOCK_VERSION)/' >$@
 src/Sconstruct.libchrome: extrasrc/Sconstruct.libchrome | src
 	cp $< $@
 src/Sconstruct.libchromeos: extrasrc/Sconstruct.libchromeos | src
@@ -58,7 +64,6 @@ src/Sconstruct.libchromeos: extrasrc/Sconstruct.libchromeos | src
 
 # Various parts of Chromium include gTest files.  To ensure consistency, get a local
 # copy of gMock and gTest (rather than picking up whatever version is installed).
-GMOCK_VERSION=1.7.0
 GMOCK_URL=https://googlemock.googlecode.com/files/gmock-$(GMOCK_VERSION).zip
 GMOCK_DIR=$(CURDIR)/src/gmock-$(GMOCK_VERSION)
 GTEST_DIR=$(GMOCK_DIR)/gtest
@@ -71,8 +76,6 @@ $(GMOCK_DIR): src/gmock-$(GMOCK_VERSION).zip
 
 # Chaps relies on utility code from Chromium base libraries, at:
 CHROMEBASE_GIT=https://chromium.googlesource.com/chromium/src/base.git
-# The following should match platform2/chaps/Makefile $BASE_VER
-CHROMEBASE_VER=293518
 # The particular version of the Chromium base library required by platforms2/chaps
 # is indicated by the BASE_VER value in platform2/chaps/Makefile.
 #  - http://crrev/$BASE_VER returns a 302-redirect to the corresponding Git commit in
@@ -108,63 +111,29 @@ src/platform2/chaps: | src/platform2
 
 
 ######################################
-# Build
-build: build_chaps
+# Build/Clean/Test - defer to src/Makefile
+build: src/Makefile
+	cd src && $(MAKE)
+clean: src/Makefile
+	cd src && $(MAKE) clean
+test: src/Makefile
+	cd src && $(MAKE) test
 
-# To build required Chromium components, defer to scons file.
-build_libchrome: src/libchrome-$(CHROMEBASE_VER).a
-src/libchrome-$(CHROMEBASE_VER).a: src_chromebase src_includes src/Sconstruct.libchrome
-	cd src && BASE_VER=$(CHROMEBASE_VER) GTEST_DIR=$(GTEST_DIR) scons -f Sconstruct.libchrome
 
-# To build required ChromiumOS components, defer to scons file.
-build_libchromeos: src/libchromeos-$(CHROMEBASE_VER).a
-src/libchromeos-$(CHROMEBASE_VER).a: src_platform2 src_includes src/Sconstruct.libchromeos
-	cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchromeos
-
-# To build Chaps, use the Makefile in platform2/chaps/
-build_chaps: src/out/libchaps.so
-src/out: | src
-	mkdir -p $@
-src/out/libchaps.so: build_libchrome build_libchromeos src_includes src_platform2 | src/out
-	cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST_DIR)/include" OUT=$(OUTDIR) $(MAKE)
-
-######################################
-# Clean
-clean: clean_chaps clean_chromeos clean_chromebase clean_gmock
-clean_gmock:
-	rm -rf $(OUTDIR)/gtest-all.out $(OUTDIR)/libgtest.a
-	rm -rf $(OUTDIR)/gmock-all.out $(OUTDIR)/libgmock.a
-clean_chromebase: src/Sconstruct.libchrome
-	-cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchrome -c
-clean_chromeos: src/Sconstruct.libchromeos
-	-cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchromeos -c
-clean_chaps:
-	-cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I $(SRCDIR)" OUT=$(OUTDIR) VERBOSE=1 $(MAKE) clean
-	rm -rf $(OUTDIR)
 
 ######################################
 # Distclean: remove source
-distclean: clean distclean_platform2 distclean_chromebase distclean_gmock
-	rm -f src/.sconsign.dblite
+distclean:
 	rm -rf src
-distclean_gmock:
-	rm -rf $(GMOCK_DIR)
-distclean_chromebase:
-	rm -rf src/base
-distclean_platform2:
-	rm -rf src/platform2
 
 
 ######################################
-# Test: run Chaps unit tests
-$(OUTDIR)/gtest-all.o: | $(OUTDIR)
-	$(CXX) -isystem $(GTEST_DIR)/include -I$(GTEST_DIR) -pthread -c $(GTEST_DIR)/src/gtest-all.cc -o $@
-$(OUTDIR)/libgtest.a: $(OUTDIR)/gtest-all.o
-	ar -rv $@ $<
-$(OUTDIR)/gmock-all.o: | $(OUTDIR)
-	$(CXX) -isystem $(GTEST_DIR)/include -I$(GTEST_DIR) -isystem $(GMOCK_DIR)/include -I$(GMOCK_DIR) -pthread -std=gnu++11 -c $(GMOCK_DIR)/src/gmock-all.cc -o $@
-$(OUTDIR)/libgmock.a: $(OUTDIR)/gmock-all.o
-	ar -rv $@ $<
+# Source tarball
+SRC_TARBALL=chaps-$(CHAPS_VERSION).tar.gz
+tarball: src/$(SRC_TARBALL)
 
-test: $(OUTDIR)/libgtest.a $(OUTDIR)/libgmock.a $(OUTDIR)/libchaps.so
-	cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include" LDLIBS="-L$(OUTDIR)" OUT=$(OUTDIR) $(MAKE) tests
+src/$(SRC_TARBALL): $(SRC_BUILDFILES) src_includes src_makefiles src_chromebase src_platform2
+	cd src && tar --exclude-vcs --dereference -czf $(SRC_TARBALL) base platform2/chaps platform2/libchromeos/chromeos include gmock-$(GMOCK_VERSION) $(BUILDFILES)
+clean_tarball:
+	rm -f src/$(SRC_TARBALL)
+
