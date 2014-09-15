@@ -132,7 +132,8 @@ src/out/libchaps.so: build_libchrome build_libchromeos src_includes src_platform
 # Clean
 clean: clean_chaps clean_chromeos clean_chromebase clean_gmock
 clean_gmock:
-	rm -rf $(GMOCK_DIR)/lib
+	rm -rf $(OUTDIR)/gtest-all.out $(OUTDIR)/libgtest.a
+	rm -rf $(OUTDIR)/gmock-all.out $(OUTDIR)/libgmock.a
 clean_chromebase: src/Sconstruct.libchrome
 	-cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchrome -c
 clean_chromeos: src/Sconstruct.libchromeos
@@ -153,3 +154,17 @@ distclean_chromebase:
 distclean_platform2:
 	rm -rf src/platform2
 
+
+######################################
+# Test: run Chaps unit tests
+$(OUTDIR)/gtest-all.o: | $(OUTDIR)
+	$(CXX) -isystem $(GTEST_DIR)/include -I$(GTEST_DIR) -pthread -c $(GTEST_DIR)/src/gtest-all.cc -o $@
+$(OUTDIR)/libgtest.a: $(OUTDIR)/gtest-all.o
+	ar -rv $@ $<
+$(OUTDIR)/gmock-all.o: | $(OUTDIR)
+	$(CXX) -isystem $(GTEST_DIR)/include -I$(GTEST_DIR) -isystem $(GMOCK_DIR)/include -I$(GMOCK_DIR) -pthread -std=gnu++11 -c $(GMOCK_DIR)/src/gmock-all.cc -o $@
+$(OUTDIR)/libgmock.a: $(OUTDIR)/gmock-all.o
+	ar -rv $@ $<
+
+test: $(OUTDIR)/libgtest.a $(OUTDIR)/libgmock.a $(OUTDIR)/libchaps.so
+	cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include" LDLIBS="-L$(OUTDIR)" OUT=$(OUTDIR) $(MAKE) tests
