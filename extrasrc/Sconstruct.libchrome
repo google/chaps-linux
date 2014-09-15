@@ -1,0 +1,175 @@
+# -*- python -*-
+
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import os
+
+# This block will most likely need updating whenever libchrome gets updated.
+# The order of the libs below doesn't matter (as scons will take care of
+# building things in the required order).
+base_name = 'base'
+base_lib = {
+    'sources' : """
+                base/at_exit.cc
+                base/atomicops_internals_x86_gcc.cc
+                base/base_switches.cc
+                base/callback_internal.cc
+                base/command_line.cc
+                base/debug/alias.cc
+                base/debug/debugger.cc
+                base/debug/debugger_posix.cc
+                base/debug/stack_trace.cc
+                base/debug/stack_trace_posix.cc
+                base/environment.cc
+                base/files/file.cc
+                base/files/file_enumerator.cc
+                base/files/file_enumerator_posix.cc
+                base/files/file_path.cc
+                base/files/file_path_constants.cc
+                base/files/file_posix.cc
+                base/files/file_util.cc
+                base/files/file_util_posix.cc
+                base/files/scoped_file.cc
+                base/files/scoped_temp_dir.cc
+                base/json/json_parser.cc
+                base/json/json_reader.cc
+                base/json/json_string_value_serializer.cc
+                base/json/json_writer.cc
+                base/json/string_escape.cc
+                base/lazy_instance.cc
+                base/location.cc
+                base/logging.cc
+                base/memory/ref_counted.cc
+                base/memory/ref_counted_memory.cc
+                base/memory/singleton.cc
+                base/memory/weak_ptr.cc
+                base/message_loop/message_pump.cc
+                base/message_loop/message_pump_default.cc
+                base/metrics/bucket_ranges.cc
+                base/metrics/histogram_base.cc
+                base/metrics/histogram_samples.cc
+                base/metrics/histogram.cc
+                base/metrics/sample_map.cc
+                base/metrics/sample_vector.cc
+                base/metrics/sparse_histogram.cc
+                base/metrics/statistics_recorder.cc
+                base/pickle.cc
+                base/process/process_handle_posix.cc
+                base/profiler/alternate_timer.cc
+                base/profiler/tracked_time.cc
+                base/rand_util.cc
+                base/rand_util_posix.cc
+                base/safe_strerror_posix.cc
+                base/strings/string16.cc
+                base/strings/string_piece.cc
+                base/strings/stringprintf.cc
+                base/strings/string_util.cc
+                base/strings/string_util_constants.cc
+                base/strings/string_split.cc
+                base/strings/string_number_conversions.cc
+                base/strings/sys_string_conversions_posix.cc
+                base/strings/utf_string_conversions.cc
+                base/strings/utf_string_conversion_utils.cc
+                base/synchronization/condition_variable_posix.cc
+                base/synchronization/lock.cc
+                base/synchronization/lock_impl_posix.cc
+                base/synchronization/waitable_event_posix.cc
+                base/sys_info_posix.cc
+                base/third_party/dmg_fp/dtoa.cc
+                base/third_party/dmg_fp/g_fmt.cc
+                base/third_party/dynamic_annotations/dynamic_annotations.c
+                base/third_party/icu/icu_utf.cc
+                base/third_party/nspr/prtime.cc
+                base/threading/non_thread_safe_impl.cc
+                base/threading/platform_thread_linux.cc
+                base/threading/platform_thread_posix.cc
+                base/threading/thread_id_name_manager.cc
+                base/threading/thread_checker_impl.cc
+                base/threading/thread_collision_warner.cc
+                base/threading/thread_local_posix.cc
+                base/threading/thread_local_storage.cc
+                base/threading/thread_local_storage_posix.cc
+                base/threading/thread_restrictions.cc
+                base/time/time.cc
+                base/time/time_posix.cc
+                base/tracked_objects.cc
+                base/strings/utf_string_conversions.cc
+                base/values.cc
+                base/vlog.cc
+                """,
+    'libs' : 'pthread rt',
+    'pc_libs' : 'glib-2.0',
+}
+
+env = Environment()
+
+BASE_VER = os.environ.get('BASE_VER', '0')
+PKG_CONFIG = os.environ.get('PKG_CONFIG', 'pkg-config')
+PWD = Dir('.').srcnode().abspath
+
+env.Append(
+  CCFLAGS=['-g']
+)
+for key in Split('CC CXX AR RANLIB LD NM CFLAGS CCFLAGS'):
+  value = os.environ.get(key)
+  if value:
+    env[key] = Split(value)
+
+env['CCFLAGS'] += ['-fPIC',
+                   '-O2',
+                   '-Wall',
+                   '-Werror',
+                   '-Wno-unused-local-typedefs',
+                   '-DOS_LINUX=1',
+                   '-DMIN_LIBBASE=1',
+                   '-DTOOLKIT_VIEWS=1',
+                   '-DUSE_AURA=1',
+                   '-DUSE_SYSTEM_LIBEVENT=1',
+                   '-DBASE_VER=%s' % BASE_VER,
+                   '-Iinclude',
+                   '-I.']
+
+# Fix issue with scons not passing some vars through the environment.
+for key in Split('PKG_CONFIG SYSROOT'):
+  if os.environ.has_key(key):
+    env['ENV'][key] = os.environ[key]
+
+# Build the library.
+e = env.Clone()
+e.Append(
+  LIBS = Split(base_lib['libs']),
+  LIBPATH = ['.'],
+  LINKFLAGS = ['-Wl,-z,defs'],
+)
+if base_lib['pc_libs']:
+  e.ParseConfig(PKG_CONFIG + ' --cflags --libs %s' % base_lib['pc_libs'])
+
+e.StaticLibrary('libchrome-%s' % BASE_VER, Split(base_lib['sources']))
+
+# Build the pkg-config text file.
+
+def lib_list(libs):
+  return ' '.join(['-l' + l for l in libs])
+
+subst_dict = {
+  '@PWD@' : PWD,
+  '@BSLOT@' : BASE_VER,
+  '@PRIVATE_PC@' : base_lib['pc_libs'],
+  '@LIBS@' : lib_list(Split(base_lib['libs'])),
+}
+env = Environment(tools = ['textfile'], SUBST_DICT = subst_dict)
+
+env.Substfile('libchrome-%s.pc' % BASE_VER,
+              [Value("""
+pkg_dir=@PWD@
+bslot=@BSLOT@
+
+Name: libchrome
+Description: Chrome base library
+Version: ${bslot}
+Requires: @PRIVATE_PC@
+Libs: -L${pkg_dir} -lchrome-${bslot} @LIBS@
+Cflags: -I${pkg_dir}
+""")])

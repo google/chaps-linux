@@ -1,0 +1,90 @@
+# -*- python -*-
+
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import os
+
+# This block will most likely need updating whenever libchromeos gets updated.
+# The order of the libs below doesn't matter (as scons will take care of
+# building things in the required order).
+base_lib = {
+    'sources' : """
+		platform2/libchromeos/chromeos/secure_blob.cc
+		platform2/libchromeos/chromeos/syslog_logging.cc
+                """,
+    'libs' : '',
+    'pc_libs' : 'dbus-c++-1',
+}
+
+env = Environment()
+
+PKG_CONFIG = os.environ.get('PKG_CONFIG', 'pkg-config')
+BASE_VER = os.environ.get('BASE_VER', '0')
+PWD = Dir('.').srcnode().abspath
+
+env.Append(
+  CPPPATH=['.'],
+  CCFLAGS=['-g']
+)
+for key in Split('CC CXX AR RANLIB LD NM CFLAGS CCFLAGS'):
+  value = os.environ.get(key)
+  if value:
+    env[key] = Split(value)
+
+env['CCFLAGS'] += ['-fPIC',
+                   '-fno-exceptions',
+                   '-std=gnu++11',
+                   '-Wall',
+                   '-Werror',
+                   '-DOS_LINUX=1',
+                   '-DTOOLKIT_VIEWS=1',
+                   '-DUSE_AURA=1',
+                   '-DUSE_SYSTEM_LIBEVENT=1',
+                   '-DBASE_VER=%s' % BASE_VER,
+                   '-Iinclude',
+                   '-Iplatform2/libchromeos']
+
+# Fix issue with scons not passing some vars through the environment.
+for key in Split('PKG_CONFIG SYSROOT'):
+  if os.environ.has_key(key):
+    env['ENV'][key] = os.environ[key]
+
+# Build the library.
+e = env.Clone()
+e.Append(
+  LIBS = Split(base_lib['libs']),
+  LIBPATH = ['.'],
+  LINKFLAGS = ['-Wl,-z,defs'],
+)
+if base_lib['pc_libs']:
+  e.ParseConfig(PKG_CONFIG + ' --cflags --libs %s' % base_lib['pc_libs'])
+
+e.StaticLibrary("libchromeos-%s" % BASE_VER, Split(base_lib['sources']))
+
+# Build the pkg-config text file.
+
+def lib_list(libs):
+  return ' '.join(['-l' + l for l in libs])
+
+subst_dict = {
+  '@PWD@' : PWD,
+  '@BSLOT@' : BASE_VER,
+  '@PRIVATE_PC@' : base_lib['pc_libs'],
+}
+
+env = Environment(tools = ['textfile'], SUBST_DICT = subst_dict)
+
+env.Substfile('libchromeos-%s.pc' % BASE_VER,
+              [Value("""
+pkg_dir=@PWD@
+bslot=@BSLOT@
+
+Name: libchromeos
+Description: chromeos base library
+Version: ${bslot}
+Requires: libchrome-${bslot} @PRIVATE_PC@
+Libs: -L${pkg_dir} -lchromeos-${bslot}
+Cflags: -I${pkg_dir}
+""")])

@@ -1,0 +1,107 @@
+From ed72c906ffc679eb56753506e66e7bc3554046c3 Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Fri, 12 Sep 2014 10:32:19 +0100
+Subject: [PATCH] Updates for standalone Linux Chaps build
+
+ - Pass through BASE_VER to preprocessor
+ - Turn on exception support, needed for D-Bus C++ library
+ - Turn on new NO_DBUS_ACQUIRE_NAME flag
+ - Protect against bad argument to C_GetInfo
+ - Downgrade excessive logs
+ - Reinstate D-Bus service file org.chromium.Chaps.service
+ - DBus::Connection::acquire_name does not exist in the upstream version
+   of libdbus-c++, so stick to the original request_name use on Linux
+
+---
+
+diff --git a/chaps/Makefile b/chaps/Makefile
+index ad55a0622ae9..f4aaf1ac18f6 100644
+--- a/chaps/Makefile
++++ b/chaps/Makefile
+@@ -34,7 +34,7 @@ PC_DEPS = dbus-c++-1 protobuf-lite openssl \
+ PC_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(PC_DEPS))
+ PC_LIBS := $(shell $(PKG_CONFIG) --libs $(PC_DEPS))
+ 
+-CXXFLAGS += -I$(SRC)/.. -I$(OUT) $(PC_CFLAGS) -DNDEBUG -std=gnu++11
++CXXFLAGS += -I$(SRC)/.. -I$(OUT) $(PC_CFLAGS) -DNDEBUG -std=gnu++11 -fexceptions -DBASE_VER=$(BASE_VER)
+ LDLIBS += $(PC_LIBS)
+ 
+ # Test if libmemenv is available, and whether libsnappy is required to
+@@ -127,9 +127,13 @@ all: CXX_BINARY(chapsd)
+ # Chaps DBus Configuration
+ ifeq ($(LINUX_BUILD),1)
+ DBUS_POLICY = "context=\"default\""
++DBUS_FLAGS = -DNO_DBUS_ACQUIRE_NAME
+ else
+ DBUS_POLICY = "group=\"pkcs11\""
++DBUS_FLAGS =
+ endif
++CXXFLAGS += $(DBUS_FLAGS)
++
+ .PHONY: $(OUT)/org.chromium.Chaps.conf
+ $(OUT)/org.chromium.Chaps.conf :
+ 	sed -e "s/@POLICY_PERMISSIONS@/$(DBUS_POLICY)/" \
+diff --git a/chaps/chaps.cc b/chaps/chaps.cc
+index 077323deb5db..c94e03cef679 100644
+--- a/chaps/chaps.cc
++++ b/chaps/chaps.cc
+@@ -183,6 +183,7 @@ CK_RV C_GetInfo(CK_INFO_PTR pInfo) {
+ 
+ // PKCS #11 v2.20 section 11.4 page 106.
+ CK_RV C_GetFunctionList(CK_FUNCTION_LIST_PTR_PTR ppFunctionList) {
++  LOG_CK_RV_AND_RETURN_IF(!ppFunctionList, CKR_ARGUMENTS_BAD);
+   static CK_VERSION version = {2, 20};
+   static CK_FUNCTION_LIST functionList = {
+     version,
+diff --git a/chaps/chaps_adaptor.cc b/chaps/chaps_adaptor.cc
+index 3e02d24fceb8..7f3eb2baedac 100644
+--- a/chaps/chaps_adaptor.cc
++++ b/chaps/chaps_adaptor.cc
+@@ -25,7 +25,11 @@ namespace chaps {
+ // Helper used when calling the ObjectAdaptor constructor.
+ static DBus::Connection& GetConnection() {
+   static DBus::Connection connection = DBus::Connection::SystemBus();
++#ifdef NO_DBUS_ACQUIRE_NAME
++  connection.request_name(kChapsServiceName);
++#else
+   CHECK(connection.acquire_name(kChapsServiceName));
++#endif
+   return connection;
+ }
+ 
+diff --git a/chaps/chaps_proxy.cc b/chaps/chaps_proxy.cc
+index 42163a32c32c..f950234603fa 100644
+--- a/chaps/chaps_proxy.cc
++++ b/chaps/chaps_proxy.cc
+@@ -38,7 +38,7 @@ bool ChapsProxyImpl::Init() {
+     if (proxy_.get()) {
+       if (!WaitForService())
+         return false;
+-      LOG(INFO) << "Chaps proxy initialized (" << kChapsServicePath << ").";
++      VLOG(1) << "Chaps proxy initialized (" << kChapsServicePath << ").";
+       return true;
+     }
+   } catch (DBus::Error err) {
+diff --git a/chaps/isolate_linux.cc b/chaps/isolate_linux.cc
+index 6be57c9bb165..e91b7258a43f 100644
+--- a/chaps/isolate_linux.cc
++++ b/chaps/isolate_linux.cc
+@@ -60,7 +60,7 @@ bool IsolateCredentialManager::GetUserIsolateCredential(
+   const FilePath credential_file = FilePath(kIsolateFilePath).Append(user);
+   if (!base::PathExists(credential_file) ||
+       !base::ReadFileToString(credential_file, &credential_string)) {
+-    LOG(INFO) << "Failed to find or read isolate credential for user "
++    VLOG(1) << "Failed to find or read isolate credential for user "
+                << user;
+     return false;
+   }
+diff --git a/chaps/org.chromium.Chaps.service b/chaps/org.chromium.Chaps.service
+new file mode 100644
+index 000000000000..10cf47eab4b8
+--- /dev/null
++++ b/chaps/org.chromium.Chaps.service
+@@ -0,0 +1,4 @@
++[D-BUS Service]
++Name=org.chromium.Chaps
++Exec=/usr/sbin/chapsd
++User=root

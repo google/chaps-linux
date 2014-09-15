@@ -1,0 +1,26 @@
+From ed72c906ffc679eb56753506e66e7bc3554046c3 Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 11 Sep 2014 17:32:19 +0100
+Subject: [PATCH] Updates for standalone Linux Chaps build
+
+ - ????
+---
+ tracked_objects.cc | 2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/tracked_objects.cc b/tracked_objects.cc
+index 56b44c10b2c3..71a0e2712a88 100644
+--- a/tracked_objects.cc
++++ b/tracked_objects.cc
+@@ -891,7 +891,7 @@ ParentChildPairSnapshot::~ParentChildPairSnapshot() {
+ // ProcessDataSnapshot
+ 
+ ProcessDataSnapshot::ProcessDataSnapshot()
+-#if !defined(OS_NACL)
++#if !defined(OS_NACL) && !defined(MIN_LIBBASE)
+     : process_id(base::GetCurrentProcId()) {
+ #else
+     : process_id(0) {
+-- 
+2.1.0.rc2.206.gedb03e5
+
