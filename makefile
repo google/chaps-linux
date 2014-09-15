@@ -151,3 +151,11 @@ $(SRC_TARBALL): src_generate
 clean_dist:
 	rm -f $(SRC_TARBALL)
 
+
+######################################
+# Debian binary package
+package: chaps_$(DEB_VERSION)_amd64.deb
+chaps_$(DEB_VERSION)_amd64.deb: src_generate
+	cd $(SRCDIR) && dpkg-buildpackage -us -uc -rfakeroot -b
+clean_package:
+	rm -f chaps_$(DEB_VERSION)_amd64.deb
