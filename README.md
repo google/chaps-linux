@@ -14,6 +14,14 @@ source code from the Chromium open source project.
 Build Instructions
 ------------------
 
+At the top level of this repository, run `make`.  This will:
+
+ - Create a source tree under `src/`.
+ - Download the relevant ChromiumOS and Chromium code under `src/`.
+ - Copy additional files needed for the Linux build.
+ - Build the code into binaries in `src/out/`, via libraries:
+     - `src/libchrome-$(BASE_VER).a`: Chromium utility code
+     - `src/libchromeos-$(BASE_VER).a`: ChromiumOS utility code
 
 
 Repository Layout

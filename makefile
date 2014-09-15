@@ -5,8 +5,10 @@ DEB_VERSION=$(CHAPS_VERSION)-$(DEB_REVISION)
 
 # Absolute location of the src/ source tree
 SRCDIR=$(CURDIR)/src
+# Output from Chaps build.
+OUTDIR=$(SRCDIR)/out
 
-all: src_generate
+all: build
 
 
 ######################################
@@ -89,4 +91,26 @@ src/platform2/chaps: | src/platform2
 	git clone $(PLATFORM2_GIT) src/platform2
 	cd src/platform2 && git checkout -b linux
 	cd src/platform2 && git am $(CURDIR)/patches/platform2.patch
+
+
+######################################
+# Build
+build: build_chaps
+
+# To build required Chromium components, defer to scons file.
+build_libchrome: src/libchrome-$(CHROMEBASE_VER).a
+src/libchrome-$(CHROMEBASE_VER).a: src_chromebase src_includes src/Sconstruct.libchrome
+	cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchrome
+
+# To build required ChromiumOS components, defer to scons file.
+build_libchromeos: src/libchromeos-$(CHROMEBASE_VER).a
+src/libchromeos-$(CHROMEBASE_VER).a: src_platform2 src_includes src/Sconstruct.libchromeos
+	cd src && BASE_VER=$(CHROMEBASE_VER) scons -f Sconstruct.libchromeos
+
+# To build Chaps, use the Makefile in platform2/chaps/
+build_chaps: src/out/libchaps.so
+src/out: | src
+	mkdir -p $@
+src/out/libchaps.so: build_libchrome build_libchromeos src_includes src_platform2 | src/out
+	cd src/platform2/chaps && BASE_VER=$(CHROMEBASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos" OUT=$(OUTDIR) $(MAKE)
 
