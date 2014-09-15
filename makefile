@@ -1,6 +1,6 @@
 # Version information
 CHAPS_VERSION=0.1
-DEB_REVISION=1
+DEB_REVISION=2
 DEB_VERSION=$(CHAPS_VERSION)-$(DEB_REVISION)
 
 # The following should match platform2/chaps/Makefile $BASE_VER
@@ -18,7 +18,7 @@ all: build
 
 ######################################
 # Generate a source tree
-src_generate: src_includes src_makefiles src_gmock src_chromebase src_platform2
+src_generate: src_includes src_makefiles src_gmock src_chromebase src_platform2 src_debian
 $(SRCDIR):
 	mkdir -p $@
 
@@ -110,6 +110,19 @@ $(SRCDIR)/platform2/chaps: | $(SRCDIR)/platform2
 	git clone $(PLATFORM2_GIT) $(SRCDIR)/platform2
 	cd $(SRCDIR)/platform2 && git checkout -b linux
 	cd $(SRCDIR)/platform2 && git am $(CURDIR)/patches/platform2.patch
+
+# Copy Debian packaging files
+DEBIAN_MASTER_FILES=$(wildcard debian/* debian/source/*)
+DEBIAN_FILES=$(addprefix $(SRCDIR)/,$(DEBIAN_MASTER_FILES))
+src_debian: $(DEBIAN_FILES)
+$(SRCDIR)/debian:
+	mkdir -p $@
+$(SRCDIR)/debian/%: debian/% | $(SRCDIR)/debian
+	cp $< $@
+$(SRCDIR)/debian/source:
+	mkdir -p $@
+$(SRCDIR)/debian/source/%: debian/source/% | $(SRCDIR)/debian/source
+	cp $< $@
 
 
 ######################################

@@ -1,0 +1,4 @@
+# If the CHAPS_SYSTEM_TOKEN variable is set, then the init script for
+# the chapsd daemon will load a system token at daemon startup.
+#
+#CHAPS_SYSTEM_TOKEN=true

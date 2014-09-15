@@ -1,0 +1,43 @@
+#!/bin/sh
+# postinst script for chaps
+#
+# see: dh_installdeb(1)
+
+set -e
+
+# summary of how this script can be called:
+#        * <postinst> `configure' <most-recently-configured-version>
+#        * <old-postinst> `abort-upgrade' <new version>
+#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
+#          <new-version>
+#        * <postinst> `abort-remove'
+#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
+#          <failed-install-package> <version> `removing'
+#          <conflicting-package> <version>
+# for details, see http://www.debian.org/doc/debian-policy/ or
+# the debian-policy package
+
+
+case "$1" in
+    configure|abort-upgrade|abort-remove|abort-deconfigure)
+	install -m 700 -d /var/lib/chaps/tokens/
+	install -m 700 -d /var/lib/chaps/tokens/system
+	install -m 755 -d /var/lib/chaps/isolates/
+	pam-auth-update --package
+    ;;
+
+    *)
+	echo "postinst called with unknown argument \`$1'" >&2
+	exit 1
+    ;;
+esac
+
+if [ -x "/etc/init.d/chaps" ]; then
+	if [ ! -e "/etc/init/chaps.conf" ]; then
+		# Manually force a later start than trousers
+		update-rc.d chaps defaults 40 60 >/dev/null
+	fi
+	invoke-rc.d chaps start || exit $?
+fi
+
+exit 0
