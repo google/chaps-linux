@@ -18,7 +18,7 @@ all: build
 
 ######################################
 # Generate a source tree
-src_generate: src_includes src_makefiles src_gmock src_chromebase src_platform2 src_debian
+src_generate: src_includes src_makefiles src_gmock src_chromebase src_platform2 src_man src_debian
 $(SRCDIR):
 	mkdir -p $@
 
@@ -116,6 +116,14 @@ $(SRCDIR)/platform2/chaps/Makefile: | $(SRCDIR)/platform2
 	cd $(SRCDIR)/platform2 && git am $(CURDIR)/patches/platform2.patch
 
 
+# Copy man pages
+src_man: $(SRCDIR)/man/chapsd.8 $(SRCDIR)/man/chaps_client.8
+$(SRCDIR)/man:
+	mkdir -p $@
+$(SRCDIR)/man/%: man/% | $(SRCDIR)/man
+	cp $< $@
+
+
 # Copy Debian packaging files
 DEBIAN_MASTER_FILES=$(wildcard debian/* debian/source/*)
 DEBIAN_FILES=$(addprefix $(SRCDIR)/,$(DEBIAN_MASTER_FILES))
@@ -146,7 +154,7 @@ SRC_TARBALL=chaps-$(CHAPS_VERSION).tar.gz
 dist: $(SRC_TARBALL)
 
 $(SRC_TARBALL): src_generate
-	tar --exclude-vcs -czf $@ $(SRCDIR_REL)/base $(SRCDIR_REL)/platform2/chaps $(SRCDIR_REL)/platform2/libchromeos/chromeos $(SRCDIR_REL)/platform2/common-mk $(SRCDIR_REL)/include $(SRCDIR_REL)/gmock-$(GMOCK_VERSION) $(SRC_BUILDFILES) $(SRCDIR_REL)/debian
+	tar --exclude-vcs -czf $@ $(SRCDIR_REL)/base $(SRCDIR_REL)/platform2/chaps $(SRCDIR_REL)/platform2/libchromeos/chromeos $(SRCDIR_REL)/platform2/common-mk $(SRCDIR_REL)/include $(SRCDIR_REL)/gmock-$(GMOCK_VERSION) $(SRC_BUILDFILES) $(SRCDIR_REL)/man $(SRCDIR_REL)/debian
 clean_dist:
 	rm -f $(SRC_TARBALL)
 

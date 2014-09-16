@@ -55,6 +55,10 @@ clean_chaps:
 distclean: clean
 	rm -f .sconsign.dblite
 
-install:
-	echo $(INSTALL)
+INSTALL ?= install
+MANDIR=$(DESTDIR)/usr/share/man
+install_man:
+	$(INSTALL) -m 0644 -D man/chapsd.8 $(MANDIR)/man8/chapsd.8
+	$(INSTALL) -m 0644 -D man/chaps_client.8 $(MANDIR)/man8/chaps_client.8
+install: install_man
 	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) $(MAKE) install_files

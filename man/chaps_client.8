@@ -1,0 +1,38 @@
+.TH CHAPS_CLIENT 8 2014-09-16 "Linux" "Linux Programmer's Manual"
+.SH NAME
+chaps_client \- controller for Chaps PKCS#11 service daemon
+.SH DESCRIPTION
+This program allows the administrator to control and configure the Chaps daemon.
+.SH OPTIONS
+.TP
+.B \-\-ping
+Check that the Chaps daemon is available.
+.TP
+.B \-\-list
+List all loaded token paths.
+.TP
+.B \-\-load \-\-path=PATH \-\-auth=AUTH [\-\-label=LABEL]
+Loads the token at the given path into the Chaps daemon.
+.TP
+.B \-\-unload \-\-path=PATH
+Unloads the token at the given path from the Chaps daemon.
+.TP
+.B \-\-change_auth \-\-path=PATH \-\-auth=AUTH \-\-new_auth=NEWAUTH
+Changes the authorization data for the token at the given path.
+.TP
+.B \-\-set_log_level=LEVEL
+Set the logging level for the Chaps daemon.  The levels are:
+.RS 4
+.IP 2 4
+Errors only.
+.IP 1 4
+Warnings and errors.
+.IP 0 4
+Normal.
+.IP \-1 4
+Verbose (logs PKCS#11 calls).
+.IP \-2 4
+More verbose (logs PKCS#11 calls and arguments).
+.RE
+.SH SEE ALSO
+.BR chapsd (8)
