@@ -1,5 +1,7 @@
 deb
 chaps-*
+chaps_*_amd64.deb
+chaps_*_amd64.changes
 chaps_*.orig.tar.gz
 chaps_*.debian.tar.gz
 chaps_*.dsc

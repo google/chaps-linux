@@ -142,12 +142,6 @@ test: src_generate
 
 
 ######################################
-# Distclean: remove source
-distclean:
-	rm -rf $(SRCDIR)
-
-
-######################################
 # Source tarball
 SRC_TARBALL=chaps-$(CHAPS_VERSION).tar.gz
 dist: $(SRC_TARBALL)
@@ -173,3 +167,12 @@ chaps_$(DEB_VERSION)_amd64.deb: src_generate
 	cd $(SRCDIR) && dpkg-buildpackage -us -uc -b
 clean_package:
 	rm -f chaps_$(DEB_VERSION)_amd64.deb
+
+
+######################################
+# Distclean: remove source and packages
+distclean:
+	rm -rf $(SRCDIR)
+	rm -f chaps_$(DEB_VERSION)_amd64.deb
+	rm -f chaps_$(CHAPS_VERSION).orig.tar.gz chaps_$(DEB_VERSION).debian.tar.gz chaps_$(DEB_VERSION)_source.changes chaps_$(DEB_VERSION).dsc
+	rm -f $(SRC_TARBALL)
