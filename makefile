@@ -98,7 +98,6 @@ $(SRCDIR)/base: | $(SRCDIR)
 $(SRCDIR)/base/base64.h: | $(SRCDIR)/base
 	git clone $(CHROMEBASE_GIT) $(SRCDIR)/base
 	cd $(SRCDIR)/base && git checkout $(CHROMEBASE_COMMIT)
-	cd $(SRCDIR)/base && git am $(CURDIR)/patches/base.patch
 
 # We need two subdirectories from the platform2 repository from ChromiumOS:
 #   - chaps/ for the Chaps source code
