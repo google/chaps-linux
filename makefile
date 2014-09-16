@@ -69,10 +69,10 @@ GMOCK_URL=https://googlemock.googlecode.com/files/gmock-$(GMOCK_VERSION).zip
 GMOCK_DIR=$(SRCDIR)/gmock-$(GMOCK_VERSION)
 GTEST_DIR=$(GMOCK_DIR)/gtest
 src_gmock: $(GMOCK_DIR)/LICENSE
-$(SRCDIR)/gmock-$(GMOCK_VERSION).zip: | $(SRCDIR)
+$(GMOCK_DIR)/LICENSE: | $(SRCDIR)
 	cd $(SRCDIR) && wget $(GMOCK_URL)
-$(GMOCK_DIR)/LICENSE: $(SRCDIR)/gmock-$(GMOCK_VERSION).zip
 	cd $(SRCDIR) && unzip -q gmock-$(GMOCK_VERSION).zip
+	rm $(SRCDIR)/gmock-$(GMOCK_VERSION).zip
 	touch $@
 
 
