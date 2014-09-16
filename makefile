@@ -159,9 +159,17 @@ clean_dist:
 
 
 ######################################
+# Debian source package
+src-package: chaps_$(CHAPS_VERSION).orig.tar.gz
+	cd $(SRCDIR) && dpkg-buildpackage -us -uc -S
+chaps_$(CHAPS_VERSION).orig.tar.gz: $(SRC_TARBALL)
+	cp -f $< $@
+
+
+######################################
 # Debian binary package
 package: chaps_$(DEB_VERSION)_amd64.deb
 chaps_$(DEB_VERSION)_amd64.deb: src_generate
-	cd $(SRCDIR) && dpkg-buildpackage -us -uc -rfakeroot -b
+	cd $(SRCDIR) && dpkg-buildpackage -us -uc -b
 clean_package:
 	rm -f chaps_$(DEB_VERSION)_amd64.deb

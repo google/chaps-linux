@@ -1,5 +1,9 @@
 deb
 chaps-*
+chaps_*.orig.tar.gz
+chaps_*.debian.tar.gz
+chaps_*.dsc
+chaps_*_source.changes
 build.out
 test.out
 package.out
