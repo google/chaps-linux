@@ -1,4 +1,4 @@
-From ed72c906ffc679eb56753506e66e7bc3554046c3 Mon Sep 17 00:00:00 2001
+From e2552a6c18b309124481d9b72a02f2cae1cf98a1 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 12 Sep 2014 10:32:19 +0100
 Subject: [PATCH] Updates for standalone Linux Chaps build
@@ -11,8 +11,17 @@ Subject: [PATCH] Updates for standalone Linux Chaps build
  - Reinstate D-Bus service file org.chromium.Chaps.service
  - DBus::Connection::acquire_name does not exist in the upstream version
    of libdbus-c++, so stick to the original request_name use on Linux
-
+ - Disable :memory: tests if libmemenv not present.
 ---
+ chaps/Makefile                   | 6 +++++-
+ chaps/chaps.cc                   | 1 +
+ chaps/chaps_adaptor.cc           | 4 ++++
+ chaps/chaps_proxy.cc             | 2 +-
+ chaps/isolate_linux.cc           | 2 +-
+ chaps/object_store_test.cc       | 2 ++
+ chaps/org.chromium.Chaps.service | 4 ++++
+ 7 files changed, 18 insertions(+), 3 deletions(-)
+ create mode 100644 chaps/org.chromium.Chaps.service
 
 diff --git a/chaps/Makefile b/chaps/Makefile
 index ad55a0622ae9..f4aaf1ac18f6 100644
@@ -95,6 +104,26 @@ index 6be57c9bb165..e91b7258a43f 100644
                 << user;
      return false;
    }
+diff --git a/chaps/object_store_test.cc b/chaps/object_store_test.cc
+index 30aafdfd175c..f5d12985b0c8 100644
+--- a/chaps/object_store_test.cc
++++ b/chaps/object_store_test.cc
+@@ -120,6 +120,7 @@ TEST_F(TestObjectStoreEncryption, CBCMode) {
+   EXPECT_FALSE(encrypted_block1 == encrypted_block2);
+ }
+ 
++#ifndef NO_MEMENV
+ TEST(TestObjectStore, InsertLoad) {
+   ObjectStoreImpl store;
+   const FilePath::CharType database[] = FILE_PATH_LITERAL(":memory:");
+@@ -224,6 +225,7 @@ TEST(TestObjectStore, DeleteAll) {
+   EXPECT_TRUE(store.GetInternalBlob(1, &internal));
+   EXPECT_EQ("internal", internal);
+ }
++#endif
+ 
+ }  // namespace chaps
+ 
 diff --git a/chaps/org.chromium.Chaps.service b/chaps/org.chromium.Chaps.service
 new file mode 100644
 index 000000000000..10cf47eab4b8
@@ -105,3 +134,6 @@ index 000000000000..10cf47eab4b8
 +Name=org.chromium.Chaps
 +Exec=/usr/sbin/chapsd
 +User=root
+-- 
+2.1.0.rc2.206.gedb03e5
+
