@@ -7,6 +7,8 @@ OUTDIR=$(SRCDIR)/out
 GMOCK_DIR=$(SRCDIR)/gmock-$(GMOCK_VER)
 GTEST_DIR=$(GMOCK_DIR)/gtest
 
+INCLUDES="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include"
+
 all: out/libchaps.so
 
 # To build required Chromium components, defer to scons file.
@@ -22,7 +24,7 @@ libchromeos-$(BASE_VER).a:
 out:
 	mkdir -p $@
 out/libchaps.so: libchrome-$(BASE_VER).a libchromeos-$(BASE_VER).a | out
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST_DIR)/include" OUT=$(OUTDIR) $(MAKE)
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) $(MAKE)
 
 
 out/gtest-all.o: | out
@@ -35,7 +37,7 @@ out/libgmock.a: out/gmock-all.o
 	ar -rv $@ $<
 
 test: out/libgtest.a out/libgmock.a out/libchaps.so
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include" LDLIBS="-L$(OUTDIR)" OUT=$(OUTDIR) $(MAKE) tests
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) LDLIBS="-L$(OUTDIR)" OUT=$(OUTDIR) $(MAKE) tests
 
 clean: clean_chaps clean_chromeos clean_chromebase clean_gmock
 clean_gmock:
@@ -55,4 +57,4 @@ distclean: clean
 
 install:
 	echo $(INSTALL)
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(CURDIR) $(MAKE) install_files
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) $(MAKE) install_files
