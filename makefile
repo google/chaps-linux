@@ -100,16 +100,22 @@ $(SRCDIR)/base/base64.h: | $(SRCDIR)/base
 	cd $(SRCDIR)/base && git checkout $(CHROMEBASE_COMMIT)
 	cd $(SRCDIR)/base && git am $(CURDIR)/patches/base.patch
 
-# Chaps is included in the platform2 repository from ChromiumOS, as are various
-# utility libraries (under libchromeos/chromeos) that it requires.
-src_platform2: $(SRCDIR)/platform2/chaps
+# We need two subdirectories from the platform2 repository from ChromiumOS:
+#   - chaps/ for the Chaps source code
+#   - libchromeos/chromeos/ for various utilities that Chaps requires.
+src_platform2: $(SRCDIR)/platform2/chaps/Makefile
 $(SRCDIR)/platform2:
 	mkdir -p $@
 PLATFORM2_GIT=https://chromium.googlesource.com/chromiumos/platform2
-$(SRCDIR)/platform2/chaps: | $(SRCDIR)/platform2
-	git clone $(PLATFORM2_GIT) $(SRCDIR)/platform2
-	cd $(SRCDIR)/platform2 && git checkout -b linux
+$(SRCDIR)/platform2/chaps/Makefile: | $(SRCDIR)/platform2
+	cd $(SRCDIR)/platform2 && git init . && git remote add -f origin $(PLATFORM2_GIT)
+	cd $(SRCDIR)/platform2 && git config core.sparsecheckout true
+	cd $(SRCDIR)/platform2 && echo "chaps" > .git/info/sparse-checkout
+	cd $(SRCDIR)/platform2 && echo "libchromeos/chromeos" >> .git/info/sparse-checkout
+	cd $(SRCDIR)/platform2 && echo "common-mk/common.mk" >> .git/info/sparse-checkout
+	cd $(SRCDIR)/platform2 && git pull origin master
 	cd $(SRCDIR)/platform2 && git am $(CURDIR)/patches/platform2.patch
+
 
 # Copy Debian packaging files
 DEBIAN_MASTER_FILES=$(wildcard debian/* debian/source/*)
@@ -147,7 +153,7 @@ SRC_TARBALL=chaps-$(CHAPS_VERSION).tar.gz
 dist: $(SRC_TARBALL)
 
 $(SRC_TARBALL): src_generate
-	tar --exclude-vcs --dereference -czf $@ $(SRCDIR_REL)/base $(SRCDIR_REL)/platform2/chaps $(SRCDIR_REL)/platform2/libchromeos/chromeos $(SRCDIR_REL)/include $(SRCDIR_REL)/gmock-$(GMOCK_VERSION) $(SRC_BUILDFILES) $(SRCDIR_REL)/debian
+	tar --exclude-vcs -czf $@ $(SRCDIR_REL)/base $(SRCDIR_REL)/platform2/chaps $(SRCDIR_REL)/platform2/libchromeos/chromeos $(SRCDIR_REL)/platform2/common-mk $(SRCDIR_REL)/include $(SRCDIR_REL)/gmock-$(GMOCK_VERSION) $(SRC_BUILDFILES) $(SRCDIR_REL)/debian
 clean_dist:
 	rm -f $(SRC_TARBALL)
 
