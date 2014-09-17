@@ -34,6 +34,7 @@ This small repo contains the following:
  - `extrasrc/`: additional source files needed for the Linux build
  - `patches/`: source code changes needed for the Linux build
  - `debian/`: Debian packaging files
+ - `man/`: vestigial man pages
 
 
 Source Code Layout
@@ -45,5 +46,25 @@ under `chaps-<version>/`.
  - `chaps-<version>/base`: Chromium base library code from https://chromium.googlesource.com/chromium/src/base.git
  - `chaps-<version>/platform2`: ChromiumOS core code, including Chaps and utility libraries required by Chaps, from
    https://chromium.googlesource.com/chromiumos/platform2
+ - `chaps-<version>/gmock-<gmock-version>`: GoogleMock and GoogleTest code
  - `chaps-<version>/include`: Local include files
  - `chaps-<version>/debian`: Local Debian packaging files
+ - `chaps-<version>/man`: man pages
+
+
+Packaging
+---------
+
+The `package` and `src-package` targets in the top-level makefile build a Debian
+binary or source package respectively.
+
+
+Package Configuration
+---------------------
+
+The behavior of the Chaps package is influenced by two configuration values:
+
+ - If the `CHAPS_SYSTEM_TOKEN` variable in `/etc/default/chaps` is set to true, the
+   Chaps daemon will load a system-wide token on startup.
+ - If the Chaps PAM module is enabled (via `pam-auth-update`) then per-user tokens will be
+   created when a user logs in.
