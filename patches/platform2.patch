@@ -1,11 +1,10 @@
-From 13c6564493bdbdd205673913f2e8f058c616de43 Mon Sep 17 00:00:00 2001
+From 3da54fb99bab6dae3f13e29422474135bd8915e4 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 12 Sep 2014 10:32:19 +0100
 Subject: [PATCH] Updates for standalone Linux Chaps build
 
  - Pass through BASE_VER to preprocessor
  - Turn on exception support, needed for D-Bus C++ library
- - Turn on new NO_DBUS_ACQUIRE_NAME flag
  - Protect against bad argument to C_GetInfo
  - Downgrade excessive logs
  - Reinstate D-Bus service file org.chromium.Chaps.service
@@ -13,19 +12,20 @@ Subject: [PATCH] Updates for standalone Linux Chaps build
    of libdbus-c++, so stick to the original request_name use on Linux
  - Disable :memory: tests if libmemenv not present.
  - Return CKR_BUFFER_TOO_SMALL if a buffer was provided by the user.
+ - Ensure PAM module links with libpam.
 ---
- chaps/Makefile                   | 6 +++++-
+ chaps/Makefile                   | 7 ++++++-
  chaps/chaps.cc                   | 3 ++-
  chaps/chaps_adaptor.cc           | 4 ++++
  chaps/chaps_proxy.cc             | 2 +-
  chaps/isolate_linux.cc           | 2 +-
  chaps/object_store_test.cc       | 2 ++
  chaps/org.chromium.Chaps.service | 4 ++++
- 7 files changed, 19 insertions(+), 4 deletions(-)
+ 7 files changed, 20 insertions(+), 4 deletions(-)
  create mode 100644 chaps/org.chromium.Chaps.service
 
 diff --git a/chaps/Makefile b/chaps/Makefile
-index ad55a06..f4aaf1a 100644
+index ad55a06..f5a35da 100644
 --- a/chaps/Makefile
 +++ b/chaps/Makefile
 @@ -34,7 +34,7 @@ PC_DEPS = dbus-c++-1 protobuf-lite openssl \
@@ -51,6 +51,14 @@ index ad55a06..f4aaf1a 100644
  .PHONY: $(OUT)/org.chromium.Chaps.conf
  $(OUT)/org.chromium.Chaps.conf :
  	sed -e "s/@POLICY_PERMISSIONS@/$(DBUS_POLICY)/" \
+@@ -164,6 +168,7 @@ pamchaps_OBJS = $(COMMON_OBJS) chaps_pam_module.o chaps.o chaps_proxy.o \
+                 token_file_manager_$(PLATFORM).o isolate_$(PLATFORM).o \
+                 platform_globals_$(PLATFORM).o
+ CXX_LIBRARY(pam_chaps.so): $(pamchaps_OBJS)
++CXX_LIBRARY(pam_chaps.so): LDLIBS += -lpam
+ clean: CLEAN(pam_chaps.so)
+ all: CXX_LIBRARY(pam_chaps.so)
+ endif
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
 index 077323d..60abdf9 100644
 --- a/chaps/chaps.cc
