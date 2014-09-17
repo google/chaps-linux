@@ -180,6 +180,6 @@ clean_package:
 # Distclean: remove source and packages
 distclean:
 	rm -rf $(SRCDIR)
-	rm -f chaps_$(DEB_VERSION)_amd64.deb
+	rm -f chaps_$(DEB_VERSION)_amd64.deb chaps_$(DEB_VERSION)_amd64.changes
 	rm -f chaps_$(CHAPS_VERSION).orig.tar.gz chaps_$(DEB_VERSION).debian.tar.gz chaps_$(DEB_VERSION)_source.changes chaps_$(DEB_VERSION).dsc
 	rm -f $(SRC_TARBALL)
