@@ -11,8 +11,34 @@ source code from the ChromiumOS open source project, together with the other req
 source code from the Chromium open source project.
 
 
+Status
+------
+
+The Linux build of Chaps is still under development, and should be considered to be alpha status.
+Known to-do items include:
+
+ - Simplify the build process (currently a combination of various different build systems)
+ - Sort out library versioning for Debian packages:
+     - Add SONAME to libchaps.so
+     - Separate into distinct packages (chaps, libchaps0, libchaps-dev)
+     - Add `ldconfig` steps to `postinst`
+ - Make the process of owning/connecting to the TPM less error-prone.
+
+
 Build Instructions
 ------------------
+
+First ensure the prerequisites are available.  The master list is given in the `Build-Depends` section of the
+`debian/control` file, but specifically includes:
+
+ - The <leveldb/memenv.h> header file, available in the `liblevedb-dev` Debian package.
+ - The SCons build tool (typically from the `scons` Debian package).
+ - Development headers for GLib 2.0 (`libglib2.0-dev` package).
+ - Development headers for the DBus C++ library (`libdbus-c++-dev` package).
+ - Development headers for protocol buffers (`libprotobuf-dev` package).
+ - Development headers for OpenSSL (`libssl-dev` package).
+ - Development headers for PAM modules (`libpam0g-dev` package).
+ - Development headers for TSS (`libtspi-dev` package).
 
 At the top level of this repository, run `make`.  This will:
 
