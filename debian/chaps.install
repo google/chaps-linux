@@ -1,0 +1,8 @@
+/etc/dbus-1/system.d/org.chromium.Chaps.conf
+/usr/share/pam-configs/chaps
+/usr/share/man/man8/chaps_client.8
+/usr/share/man/man8/chapsd.8
+/usr/share/dbus-1/system-services/org.chromium.Chaps.service
+/usr/bin/chaps_client
+/usr/sbin/chapsd
+/lib/security/pam_chaps.so

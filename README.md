@@ -18,10 +18,6 @@ The Linux build of Chaps is still under development, and should be considered to
 Known to-do items include:
 
  - Simplify the build process (currently a combination of various different build systems)
- - Sort out library versioning for Debian packages:
-     - Add SONAME to libchaps.so
-     - Separate into distinct packages (chaps, libchaps0, libchaps-dev)
-     - Add `ldconfig` steps to `postinst`
  - Make the process of owning/connecting to the TPM less error-prone.
 
 

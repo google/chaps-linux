@@ -20,7 +20,7 @@ Vcs-Git: git://github.org/google/chaps-linux.git
 Vcs-Browser: https://github.org/google/chaps-linux
 
 Package: chaps
-Architecture: any
+Architecture: amd64
 Depends: trousers (>= 0.3.7), ${shlibs:Depends}, ${misc:Depends}
 Description: PKCS #11 implementation for TPM backed services
  Chaps is a PKCS #11 implementation that provides trusted platform module (TPM)
@@ -31,6 +31,23 @@ Description: PKCS #11 implementation for TPM backed services
  is not limited to working with TrouSerS.  The name "Chaps" has no real
  significance other than its fitness as a name for a layer above TrouSerS.
  .
- This package includes a PAM module which, if enabled, generates a PKCS #11
- token for each user that logs into the system.  To make use of this, the
- installing user should log out and in again to get access to their token.
+ This package includes the daemon and a PAM module which, if enabled,
+ generates a PKCS #11 token for each user that logs into the system.
+ .
+ To generate a PKCS #11 token, the installing user should log out and in again
+ to get access to their token.
+
+Package: libchaps0
+Architecture: amd64
+Depends: chaps (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: PKCS #11 implementation library
+ Chaps is a PKCS #11 implementation that provides trusted platform module (TPM)
+ backed cryptographic services. It aims to improve speed and reliability of
+ cryptographic token operations as well as to provide a simpler and more
+ flexible codebase for future enhancements.  Chaps works with a TCG Software
+ Stack (TSS).  Typically the TrouSerS TSS implementation is used, but Chaps
+ is not limited to working with TrouSerS.  The name "Chaps" has no real
+ significance other than its fitness as a name for a layer above TrouSerS.
+ .
+ This package includes the shared library that provides application
+ access to the PKCS #11 API.
