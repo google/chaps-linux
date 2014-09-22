@@ -1,4 +1,4 @@
-From 3da54fb99bab6dae3f13e29422474135bd8915e4 Mon Sep 17 00:00:00 2001
+From 315c5aa421c4cab3f0e8b0cf0bae89b57ead9bef Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 12 Sep 2014 10:32:19 +0100
 Subject: [PATCH] Updates for standalone Linux Chaps build
@@ -13,19 +13,20 @@ Subject: [PATCH] Updates for standalone Linux Chaps build
  - Disable :memory: tests if libmemenv not present.
  - Return CKR_BUFFER_TOO_SMALL if a buffer was provided by the user.
  - Ensure PAM module links with libpam.
+ - Set SONAME in libchaps.0.so if CHAPS_VERSION_MAJOR specified.
 ---
- chaps/Makefile                   | 7 ++++++-
- chaps/chaps.cc                   | 3 ++-
- chaps/chaps_adaptor.cc           | 4 ++++
- chaps/chaps_proxy.cc             | 2 +-
- chaps/isolate_linux.cc           | 2 +-
- chaps/object_store_test.cc       | 2 ++
- chaps/org.chromium.Chaps.service | 4 ++++
- 7 files changed, 20 insertions(+), 4 deletions(-)
+ chaps/Makefile                   | 24 +++++++++++++++++++++++-
+ chaps/chaps.cc                   |  3 ++-
+ chaps/chaps_adaptor.cc           |  4 ++++
+ chaps/chaps_proxy.cc             |  2 +-
+ chaps/isolate_linux.cc           |  2 +-
+ chaps/object_store_test.cc       |  2 ++
+ chaps/org.chromium.Chaps.service |  4 ++++
+ 7 files changed, 37 insertions(+), 4 deletions(-)
  create mode 100644 chaps/org.chromium.Chaps.service
 
 diff --git a/chaps/Makefile b/chaps/Makefile
-index ad55a06..f5a35da 100644
+index ad55a0622ae9..2083816e5f26 100644
 --- a/chaps/Makefile
 +++ b/chaps/Makefile
 @@ -34,7 +34,7 @@ PC_DEPS = dbus-c++-1 protobuf-lite openssl \
@@ -51,7 +52,25 @@ index ad55a06..f5a35da 100644
  .PHONY: $(OUT)/org.chromium.Chaps.conf
  $(OUT)/org.chromium.Chaps.conf :
  	sed -e "s/@POLICY_PERMISSIONS@/$(DBUS_POLICY)/" \
-@@ -164,6 +168,7 @@ pamchaps_OBJS = $(COMMON_OBJS) chaps_pam_module.o chaps.o chaps_proxy.o \
+@@ -144,6 +148,17 @@ CXX_LIBRARY(libchaps.so): $(libchaps_OBJS)
+ clean: CLEAN(libchaps.so)
+ all: CXX_LIBRARY(libchaps.so)
+ 
++ifneq ($(CHAPS_VERSION_MAJOR),)
++ifneq ($(CHAPS_VERSION_MINOR),)
++CHAPS_VERSION=$(CHAPS_VERSION_MAJOR).$(CHAPS_VERSION_MINOR)
++# Also build a version with SONAME set.
++CXX_LIBRARY(libchaps.so.$(CHAPS_VERSION)): $(libchaps_OBJS)
++CXX_LIBRARY(libchaps.so.$(CHAPS_VERSION)): LDFLAGS += -Wl,-soname,libchaps.so.$(CHAPS_VERSION_MAJOR)
++clean: CLEAN(libchaps.so.$(CHAPS_VERSION))
++all: CXX_LIBRARY(libchaps.so.$(CHAPS_VERSION))
++endif
++endif
++
+ # Chaps Client CLI App
+ chaps_client_OBJS = $(COMMON_OBJS) chaps_client.o chaps_proxy.o \
+                     token_manager_client.o isolate_$(PLATFORM).o
+@@ -164,6 +179,7 @@ pamchaps_OBJS = $(COMMON_OBJS) chaps_pam_module.o chaps.o chaps_proxy.o \
                  token_file_manager_$(PLATFORM).o isolate_$(PLATFORM).o \
                  platform_globals_$(PLATFORM).o
  CXX_LIBRARY(pam_chaps.so): $(pamchaps_OBJS)
@@ -59,8 +78,22 @@ index ad55a06..f5a35da 100644
  clean: CLEAN(pam_chaps.so)
  all: CXX_LIBRARY(pam_chaps.so)
  endif
+@@ -173,7 +189,13 @@ ifeq ($(LINUX_BUILD), 1)
+ install_files: all
+ 	$(INSTALL) -D $(OUT)/chapsd $(DESTDIR)/usr/sbin/chapsd
+ 	$(INSTALL) -D $(OUT)/chaps_client $(DESTDIR)/usr/bin/chaps_client
++ifneq ($(CHAPS_VERSION),)
++	$(INSTALL) -D $(OUT)/libchaps.so.$(CHAPS_VERSION) $(DESTDIR)$(LIB_DIR)/libchaps.so.$(CHAPS_VERSION)
++	cd $(DESTDIR)$(LIB_DIR) && ln -s -f libchaps.so.$(CHAPS_VERSION) libchaps.so.$(CHAPS_VERSION_MAJOR)
++	cd $(DESTDIR)$(LIB_DIR) && ln -s -f libchaps.so.$(CHAPS_VERSION_MAJOR) libchaps.so
++else
+ 	$(INSTALL) -D $(OUT)/libchaps.so $(DESTDIR)$(LIB_DIR)/libchaps.so
++endif
+ 	$(INSTALL_DATA) -D $(OUT)/org.chromium.Chaps.conf \
+ 	  $(DESTDIR)/etc/dbus-1/system.d/org.chromium.Chaps.conf
+ 	$(INSTALL_DATA) -D $(SRC)/org.chromium.Chaps.service \
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
-index 077323d..60abdf9 100644
+index 077323deb5db..60abdf9ea858 100644
 --- a/chaps/chaps.cc
 +++ b/chaps/chaps.cc
 @@ -76,7 +76,7 @@ static CK_RV HandlePKCS11Output(CK_RV result,
@@ -81,7 +114,7 @@ index 077323d..60abdf9 100644
    static CK_FUNCTION_LIST functionList = {
      version,
 diff --git a/chaps/chaps_adaptor.cc b/chaps/chaps_adaptor.cc
-index 3e02d24..7f3eb2b 100644
+index 3e02d24fceb8..7f3eb2baedac 100644
 --- a/chaps/chaps_adaptor.cc
 +++ b/chaps/chaps_adaptor.cc
 @@ -25,7 +25,11 @@ namespace chaps {
@@ -97,7 +130,7 @@ index 3e02d24..7f3eb2b 100644
  }
  
 diff --git a/chaps/chaps_proxy.cc b/chaps/chaps_proxy.cc
-index 42163a3..f950234 100644
+index 42163a32c32c..f950234603fa 100644
 --- a/chaps/chaps_proxy.cc
 +++ b/chaps/chaps_proxy.cc
 @@ -38,7 +38,7 @@ bool ChapsProxyImpl::Init() {
@@ -110,7 +143,7 @@ index 42163a3..f950234 100644
      }
    } catch (DBus::Error err) {
 diff --git a/chaps/isolate_linux.cc b/chaps/isolate_linux.cc
-index 6be57c9..e91b725 100644
+index 6be57c9bb165..e91b7258a43f 100644
 --- a/chaps/isolate_linux.cc
 +++ b/chaps/isolate_linux.cc
 @@ -60,7 +60,7 @@ bool IsolateCredentialManager::GetUserIsolateCredential(
@@ -123,7 +156,7 @@ index 6be57c9..e91b725 100644
      return false;
    }
 diff --git a/chaps/object_store_test.cc b/chaps/object_store_test.cc
-index 30aafdf..f5d1298 100644
+index 30aafdfd175c..f5d12985b0c8 100644
 --- a/chaps/object_store_test.cc
 +++ b/chaps/object_store_test.cc
 @@ -120,6 +120,7 @@ TEST_F(TestObjectStoreEncryption, CBCMode) {
@@ -144,7 +177,7 @@ index 30aafdf..f5d1298 100644
  
 diff --git a/chaps/org.chromium.Chaps.service b/chaps/org.chromium.Chaps.service
 new file mode 100644
-index 0000000..10cf47e
+index 000000000000..10cf47eab4b8
 --- /dev/null
 +++ b/chaps/org.chromium.Chaps.service
 @@ -0,0 +1,4 @@
@@ -153,5 +186,5 @@ index 0000000..10cf47e
 +Exec=/usr/sbin/chapsd
 +User=root
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 

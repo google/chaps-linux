@@ -1,5 +1,7 @@
 # Version information
-CHAPS_VERSION=0.1
+CHAPS_VERSION_MAJOR=0
+CHAPS_VERSION_MINOR=1
+CHAPS_VERSION=$(CHAPS_VERSION_MAJOR).$(CHAPS_VERSION_MINOR)
 DEB_REVISION=2
 DEB_VERSION=$(CHAPS_VERSION)-$(DEB_REVISION)
 
@@ -56,7 +58,8 @@ BUILDFILES=Makefile Sconstruct.libchrome Sconstruct.libchromeos
 SRC_BUILDFILES=$(addprefix $(SRCDIR_REL)/, $(BUILDFILES))
 src_makefiles: $(SRC_BUILDFILES)
 $(SRCDIR_REL)/Makefile: extrasrc/Makefile | $(SRCDIR)
-	sed 's/@BASE_VER@/$(CHROMEBASE_VER)/' $< | sed 's/@GMOCK_VER@/$(GMOCK_VERSION)/' >$@
+	sed 's/@BASE_VER@/$(CHROMEBASE_VER)/' $< | sed 's/@GMOCK_VER@/$(GMOCK_VERSION)/' |\
+	sed 's/@CHAPS_VERSION_MAJOR@/$(CHAPS_VERSION_MAJOR)/' | sed s'/@CHAPS_VERSION_MINOR@/$(CHAPS_VERSION_MINOR)/' >$@
 $(SRCDIR_REL)/Sconstruct.libchrome: extrasrc/Sconstruct.libchrome | $(SRCDIR)
 	cp $< $@
 $(SRCDIR_REL)/Sconstruct.libchromeos: extrasrc/Sconstruct.libchromeos | $(SRCDIR)

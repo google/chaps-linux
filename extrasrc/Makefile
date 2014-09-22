@@ -1,6 +1,9 @@
 # Top-level Makefile for Chaps standalone Linux build.
 BASE_VER ?= @BASE_VER@
 GMOCK_VER ?= @GMOCK_VER@
+CHAPS_VERSION_MAJOR ?= @CHAPS_VERSION_MAJOR@
+CHAPS_VERSION_MINOR ?= @CHAPS_VERSION_MINOR@
+CHAPS_VERSION=$(CHAPS_VERSION_MAJOR).$(CHAPS_VERSION_MINOR)
 
 SRCDIR=$(CURDIR)
 OUTDIR=$(SRCDIR)/out
@@ -11,7 +14,7 @@ INCLUDES="-I$(SRCDIR)/include -I$(SRCDIR)/platform2/libchromeos -isystem $(GTEST
 
 # To build Chaps, defer to platform2/chaps/Makefile
 all: libchrome-$(BASE_VER).a libchromeos-$(BASE_VER).a | out
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) $(MAKE)
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) CHAPS_VERSION_MAJOR=$(CHAPS_VERSION_MAJOR) CHAPS_VERSION_MINOR=$(CHAPS_VERSION_MINOR) $(MAKE)
 
 # To build required Chromium components, defer to scons file.
 libchrome-$(BASE_VER).a:
@@ -59,4 +62,4 @@ install_man:
 	$(INSTALL) -m 0644 -D man/chapsd.8 $(MANDIR)/man8/chapsd.8
 	$(INSTALL) -m 0644 -D man/chaps_client.8 $(MANDIR)/man8/chaps_client.8
 install: install_man
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) $(MAKE) install_files
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) CHAPS_VERSION_MAJOR=$(CHAPS_VERSION_MAJOR) CHAPS_VERSION_MINOR=$(CHAPS_VERSION_MINOR) $(MAKE) install_files
