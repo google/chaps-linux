@@ -20,7 +20,7 @@ Vcs-Git: git://github.org/google/chaps-linux.git
 Vcs-Browser: https://github.org/google/chaps-linux
 
 Package: chaps
-Architecture: amd64
+Architecture: any
 Depends: trousers (>= 0.3.7), ${shlibs:Depends}, ${misc:Depends}
 Description: PKCS #11 implementation for TPM backed services
  Chaps is a PKCS #11 implementation that provides trusted platform module (TPM)
@@ -38,7 +38,7 @@ Description: PKCS #11 implementation for TPM backed services
  to get access to their token.
 
 Package: libchaps0
-Architecture: amd64
+Architecture: any
 Depends: chaps (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: PKCS #11 implementation library
  Chaps is a PKCS #11 implementation that provides trusted platform module (TPM)
