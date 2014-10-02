@@ -1,4 +1,4 @@
-From 315c5aa421c4cab3f0e8b0cf0bae89b57ead9bef Mon Sep 17 00:00:00 2001
+From 625c4231a001d4c710a25a800a45d086ae183801 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 12 Sep 2014 10:32:19 +0100
 Subject: [PATCH] Updates for standalone Linux Chaps build
@@ -14,19 +14,22 @@ Subject: [PATCH] Updates for standalone Linux Chaps build
  - Return CKR_BUFFER_TOO_SMALL if a buffer was provided by the user.
  - Ensure PAM module links with libpam.
  - Set SONAME in libchaps.0.so if CHAPS_VERSION_MAJOR specified.
+ - Prevent interspersal of incremental and one-shot operations.
 ---
- chaps/Makefile                   | 24 +++++++++++++++++++++++-
+ chaps/Makefile                   | 24 ++++++++++++++++++++++-
  chaps/chaps.cc                   |  3 ++-
  chaps/chaps_adaptor.cc           |  4 ++++
  chaps/chaps_proxy.cc             |  2 +-
  chaps/isolate_linux.cc           |  2 +-
  chaps/object_store_test.cc       |  2 ++
  chaps/org.chromium.Chaps.service |  4 ++++
- 7 files changed, 37 insertions(+), 4 deletions(-)
+ chaps/session_impl.cc            | 42 ++++++++++++++++++++++++++++++++++++++--
+ chaps/session_impl.h             |  9 +++++++++
+ 9 files changed, 86 insertions(+), 6 deletions(-)
  create mode 100644 chaps/org.chromium.Chaps.service
 
 diff --git a/chaps/Makefile b/chaps/Makefile
-index ad55a0622ae9..2083816e5f26 100644
+index ad55a06..2083816 100644
 --- a/chaps/Makefile
 +++ b/chaps/Makefile
 @@ -34,7 +34,7 @@ PC_DEPS = dbus-c++-1 protobuf-lite openssl \
@@ -93,7 +96,7 @@ index ad55a0622ae9..2083816e5f26 100644
  	  $(DESTDIR)/etc/dbus-1/system.d/org.chromium.Chaps.conf
  	$(INSTALL_DATA) -D $(SRC)/org.chromium.Chaps.service \
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
-index 077323deb5db..60abdf9ea858 100644
+index 077323d..60abdf9 100644
 --- a/chaps/chaps.cc
 +++ b/chaps/chaps.cc
 @@ -76,7 +76,7 @@ static CK_RV HandlePKCS11Output(CK_RV result,
@@ -114,7 +117,7 @@ index 077323deb5db..60abdf9ea858 100644
    static CK_FUNCTION_LIST functionList = {
      version,
 diff --git a/chaps/chaps_adaptor.cc b/chaps/chaps_adaptor.cc
-index 3e02d24fceb8..7f3eb2baedac 100644
+index 3e02d24..7f3eb2b 100644
 --- a/chaps/chaps_adaptor.cc
 +++ b/chaps/chaps_adaptor.cc
 @@ -25,7 +25,11 @@ namespace chaps {
@@ -130,7 +133,7 @@ index 3e02d24fceb8..7f3eb2baedac 100644
  }
  
 diff --git a/chaps/chaps_proxy.cc b/chaps/chaps_proxy.cc
-index 42163a32c32c..f950234603fa 100644
+index 42163a3..f950234 100644
 --- a/chaps/chaps_proxy.cc
 +++ b/chaps/chaps_proxy.cc
 @@ -38,7 +38,7 @@ bool ChapsProxyImpl::Init() {
@@ -143,7 +146,7 @@ index 42163a32c32c..f950234603fa 100644
      }
    } catch (DBus::Error err) {
 diff --git a/chaps/isolate_linux.cc b/chaps/isolate_linux.cc
-index 6be57c9bb165..e91b7258a43f 100644
+index 6be57c9..e91b725 100644
 --- a/chaps/isolate_linux.cc
 +++ b/chaps/isolate_linux.cc
 @@ -60,7 +60,7 @@ bool IsolateCredentialManager::GetUserIsolateCredential(
@@ -156,7 +159,7 @@ index 6be57c9bb165..e91b7258a43f 100644
      return false;
    }
 diff --git a/chaps/object_store_test.cc b/chaps/object_store_test.cc
-index 30aafdfd175c..f5d12985b0c8 100644
+index 30aafdf..f5d1298 100644
 --- a/chaps/object_store_test.cc
 +++ b/chaps/object_store_test.cc
 @@ -120,6 +120,7 @@ TEST_F(TestObjectStoreEncryption, CBCMode) {
@@ -177,7 +180,7 @@ index 30aafdfd175c..f5d12985b0c8 100644
  
 diff --git a/chaps/org.chromium.Chaps.service b/chaps/org.chromium.Chaps.service
 new file mode 100644
-index 000000000000..10cf47eab4b8
+index 0000000..10cf47e
 --- /dev/null
 +++ b/chaps/org.chromium.Chaps.service
 @@ -0,0 +1,4 @@
@@ -185,6 +188,114 @@ index 000000000000..10cf47eab4b8
 +Name=org.chromium.Chaps
 +Exec=/usr/sbin/chapsd
 +User=root
+diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
+index 76ee65f..af625c0 100644
+--- a/chaps/session_impl.cc
++++ b/chaps/session_impl.cc
+@@ -280,6 +280,20 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
+     LOG(ERROR) << "Operation is not initialized.";
+     return CKR_OPERATION_NOT_INITIALIZED;
+   }
++  if (context->is_single_) {
++    LOG(ERROR) << "Operation is not incremental.";
++    return CKR_OPERATION_ACTIVE;
++  }
++  context->is_incremental_ = true;
++  return OperationUpdateInternal(operation, data_in, required_out_length, data_out);
++}
++
++CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
++                                           const string& data_in,
++                                           int* required_out_length,
++                                           string* data_out) {
++  CHECK(operation < kNumOperationTypes);
++  OperationContext* context = &operation_context_[operation];
+   if (context->is_cipher_) {
+     return CipherUpdate(context, data_in, required_out_length, data_out);
+   } else if (context->is_digest_) {
+@@ -310,6 +324,19 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
+     LOG(ERROR) << "Operation is not initialized.";
+     return CKR_OPERATION_NOT_INITIALIZED;
+   }
++  if (context->is_single_) {
++    LOG(ERROR) << "Operation is not incremental.";
++    return CKR_OPERATION_ACTIVE;
++  }
++  context->is_incremental_ = true;
++  return OperationFinalInternal(operation, required_out_length, data_out);
++}
++
++CK_RV SessionImpl::OperationFinalInternal(OperationType operation,
++                                          int* required_out_length,
++                                          string* data_out) {
++  CHECK(operation < kNumOperationTypes);
++  OperationContext* context = &operation_context_[operation];
+   context->is_valid_ = false;
+   // Complete the operation if it has not already been done.
+   if (!context->is_finished_) {
+@@ -387,15 +414,24 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
+                                        string* data_out) {
+   CHECK(operation < kNumOperationTypes);
+   OperationContext* context = &operation_context_[operation];
++  if (!context->is_valid_) {
++    LOG(ERROR) << "Operation is not initialized.";
++    return CKR_OPERATION_NOT_INITIALIZED;
++  }
++  if (context->is_incremental_) {
++    LOG(ERROR) << "Operation is incremental.";
++    return CKR_OPERATION_ACTIVE;
++  }
++  context->is_single_ = true;
+   CK_RV result = CKR_OK;
+   if (!context->is_finished_) {
+     string update, final;
+     int max = INT_MAX;
+-    result = OperationUpdate(operation, data_in, &max, &update);
++    result = OperationUpdateInternal(operation, data_in, &max, &update);
+     if (result != CKR_OK)
+       return result;
+     max = INT_MAX;
+-    result = OperationFinal(operation, &max, &final);
++    result = OperationFinalInternal(operation, &max, &final);
+     if (result != CKR_OK)
+       return result;
+     context->data_ = update + final;
+@@ -1332,6 +1368,8 @@ void SessionImpl::OperationContext::Clear() {
+   is_cipher_ = false;
+   is_digest_ = false;
+   is_hmac_ = false;
++  is_incremental_ = false;
++  is_single_ = false;
+   is_finished_ = false;
+   key_ = NULL;
+   data_.clear();
+diff --git a/chaps/session_impl.h b/chaps/session_impl.h
+index 37307ce..7dcb735 100644
+--- a/chaps/session_impl.h
++++ b/chaps/session_impl.h
+@@ -111,6 +111,8 @@ class SessionImpl : public Session {
+     bool is_cipher_;  // Set to true when cipher_context_ is valid.
+     bool is_digest_;  // Set to true when digest_context_ is valid.
+     bool is_hmac_;  // Set to true when hmac_context_ is valid.
++    bool is_incremental_;  // Set to true when an incremental operation is performed.
++    bool is_single_;  // Set to true when a single operation is performed.
+     bool is_finished_;  // Set to true when the operation completes.
+     union {
+       EVP_CIPHER_CTX cipher_context_;
+@@ -133,6 +135,13 @@ class SessionImpl : public Session {
+                       CK_OBJECT_CLASS object_class,
+                       CK_KEY_TYPE key_type);
+   bool IsValidMechanism(OperationType operation, CK_MECHANISM_TYPE mechanism);
++  CK_RV OperationUpdateInternal(OperationType operation,
++                                const std::string& data_in,
++                                int* required_out_length,
++                                std::string* data_out);
++  CK_RV OperationFinalInternal(OperationType operation,
++                               int* required_out_length,
++                               std::string* data_out);
+   CK_RV CipherInit(bool is_encrypt,
+                    CK_MECHANISM_TYPE mechanism,
+                    const std::string& mechanism_parameter,
 -- 
-2.1.0.rc2.206.gedb03e5
+1.9.1
 
