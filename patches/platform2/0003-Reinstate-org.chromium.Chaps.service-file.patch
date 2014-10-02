@@ -1,0 +1,24 @@
+From c1d09529e42b2a216baafda7a4734293cc18483f Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 2 Oct 2014 12:00:19 +0100
+Subject: [PATCH 3/8] Reinstate org.chromium.Chaps.service file
+
+This reverts commit 6e8077189cbb ("Remove org.chromium.Chaps.service")
+---
+ chaps/org.chromium.Chaps.service | 4 ++++
+ 1 file changed, 4 insertions(+)
+ create mode 100644 chaps/org.chromium.Chaps.service
+
+diff --git a/chaps/org.chromium.Chaps.service b/chaps/org.chromium.Chaps.service
+new file mode 100644
+index 0000000..10cf47e
+--- /dev/null
++++ b/chaps/org.chromium.Chaps.service
+@@ -0,0 +1,4 @@
++[D-BUS Service]
++Name=org.chromium.Chaps
++Exec=/usr/sbin/chapsd
++User=root
+-- 
+1.9.1
+

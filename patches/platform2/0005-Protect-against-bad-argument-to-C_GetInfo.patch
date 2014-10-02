@@ -1,0 +1,24 @@
+From 0cef5fbaf41b5dbea02e91d241106db8504b31cb Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 2 Oct 2014 12:03:15 +0100
+Subject: [PATCH 5/8] Protect against bad argument to C_GetInfo
+
+---
+ chaps/chaps.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/chaps/chaps.cc b/chaps/chaps.cc
+index 077323d..c94e03c 100644
+--- a/chaps/chaps.cc
++++ b/chaps/chaps.cc
+@@ -183,6 +183,7 @@ CK_RV C_GetInfo(CK_INFO_PTR pInfo) {
+ 
+ // PKCS #11 v2.20 section 11.4 page 106.
+ CK_RV C_GetFunctionList(CK_FUNCTION_LIST_PTR_PTR ppFunctionList) {
++  LOG_CK_RV_AND_RETURN_IF(!ppFunctionList, CKR_ARGUMENTS_BAD);
+   static CK_VERSION version = {2, 20};
+   static CK_FUNCTION_LIST functionList = {
+     version,
+-- 
+1.9.1
+

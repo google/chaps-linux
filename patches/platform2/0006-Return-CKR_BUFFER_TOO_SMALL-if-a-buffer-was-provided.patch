@@ -1,0 +1,30 @@
+From bed2d8b593f92a1baaf9dcdf916b679584aa899c Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 2 Oct 2014 12:05:04 +0100
+Subject: [PATCH 6/8] Return CKR_BUFFER_TOO_SMALL if a buffer was provided by
+ the user
+
+As per PKCS#11 s11.2:
+ - if the output buffer is NULL, the return code should be CKR_OK
+ - if the output buffer is present but too small, the return code should be
+   CKR_BUFFER_TOO_SMALL
+---
+ chaps/chaps.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/chaps/chaps.cc b/chaps/chaps.cc
+index c94e03c..60abdf9 100644
+--- a/chaps/chaps.cc
++++ b/chaps/chaps.cc
+@@ -76,7 +76,7 @@ static CK_RV HandlePKCS11Output(CK_RV result,
+     memcpy(out_buffer, &output.front(), output.size());
+   } else {
+     *out_buffer_length = static_cast<CK_ULONG>(output_length);
+-    if (result == CKR_BUFFER_TOO_SMALL)
++    if (result == CKR_BUFFER_TOO_SMALL && !out_buffer)
+       result = CKR_OK;
+   }
+   return result;
+-- 
+1.9.1
+

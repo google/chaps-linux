@@ -1,0 +1,32 @@
+From 0a5f70508753083c52d2abb5e596ab8d25b39f95 Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 2 Oct 2014 12:05:57 +0100
+Subject: [PATCH 7/8] Disable :memory: tests if libmemenv not present
+
+---
+ chaps/object_store_test.cc | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/chaps/object_store_test.cc b/chaps/object_store_test.cc
+index 30aafdf..f5d1298 100644
+--- a/chaps/object_store_test.cc
++++ b/chaps/object_store_test.cc
+@@ -120,6 +120,7 @@ TEST_F(TestObjectStoreEncryption, CBCMode) {
+   EXPECT_FALSE(encrypted_block1 == encrypted_block2);
+ }
+ 
++#ifndef NO_MEMENV
+ TEST(TestObjectStore, InsertLoad) {
+   ObjectStoreImpl store;
+   const FilePath::CharType database[] = FILE_PATH_LITERAL(":memory:");
+@@ -224,6 +225,7 @@ TEST(TestObjectStore, DeleteAll) {
+   EXPECT_TRUE(store.GetInternalBlob(1, &internal));
+   EXPECT_EQ("internal", internal);
+ }
++#endif
+ 
+ }  // namespace chaps
+ 
+-- 
+1.9.1
+

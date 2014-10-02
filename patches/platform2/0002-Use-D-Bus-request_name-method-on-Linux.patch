@@ -1,0 +1,49 @@
+From 1179ed3b51ed68d530e4dc903a91e43469666a4f Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 2 Oct 2014 11:57:19 +0100
+Subject: [PATCH 2/8] Use D-Bus request_name() method on Linux
+
+DBus::Connection::acquire_name does not exist in the upstream version
+ of libdbus-c++, so stick to the original request_name use on Linux.
+---
+ chaps/Makefile         | 4 ++++
+ chaps/chaps_adaptor.cc | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/chaps/Makefile b/chaps/Makefile
+index 9ce946e..2083816 100644
+--- a/chaps/Makefile
++++ b/chaps/Makefile
+@@ -127,9 +127,13 @@ all: CXX_BINARY(chapsd)
+ # Chaps DBus Configuration
+ ifeq ($(LINUX_BUILD),1)
+ DBUS_POLICY = "context=\"default\""
++DBUS_FLAGS = -DNO_DBUS_ACQUIRE_NAME
+ else
+ DBUS_POLICY = "group=\"pkcs11\""
++DBUS_FLAGS =
+ endif
++CXXFLAGS += $(DBUS_FLAGS)
++
+ .PHONY: $(OUT)/org.chromium.Chaps.conf
+ $(OUT)/org.chromium.Chaps.conf :
+ 	sed -e "s/@POLICY_PERMISSIONS@/$(DBUS_POLICY)/" \
+diff --git a/chaps/chaps_adaptor.cc b/chaps/chaps_adaptor.cc
+index 3e02d24..7f3eb2b 100644
+--- a/chaps/chaps_adaptor.cc
++++ b/chaps/chaps_adaptor.cc
+@@ -25,7 +25,11 @@ namespace chaps {
+ // Helper used when calling the ObjectAdaptor constructor.
+ static DBus::Connection& GetConnection() {
+   static DBus::Connection connection = DBus::Connection::SystemBus();
++#ifdef NO_DBUS_ACQUIRE_NAME
++  connection.request_name(kChapsServiceName);
++#else
+   CHECK(connection.acquire_name(kChapsServiceName));
++#endif
+   return connection;
+ }
+ 
+-- 
+1.9.1
+
