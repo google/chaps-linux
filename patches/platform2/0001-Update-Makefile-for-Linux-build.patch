@@ -1,7 +1,7 @@
-From a81aabb7f1340a64108b3f4de0d5e72e90fc5a3e Mon Sep 17 00:00:00 2001
+From 53a4b8330f8b5cf80ac33e2cf83464d735b337b7 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 11:56:01 +0100
-Subject: [PATCH 1/8] Update Makefile for Linux build
+Subject: [PATCH 1/9] Update Makefile for Linux build
 
  - Pass through BASE_VER to preprocessor.
  - Turn on exception support, needed for D-Bus C++ library.

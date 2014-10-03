@@ -1,7 +1,7 @@
-From 6943f332bf321f2e70639b2b14888dd3f8f47d0b Mon Sep 17 00:00:00 2001
+From 69bbdb7e26100f707402be63b7d8dcb69d78c597 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:02:08 +0100
-Subject: [PATCH 4/8] Downgrade excessive logs
+Subject: [PATCH 4/9] Downgrade excessive logs
 
 ---
  chaps/chaps_proxy.cc   | 2 +-

@@ -1,0 +1,1120 @@
+From d93952fe1eaeb179b6de62a7045f47398e1a3b9c Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Fri, 3 Oct 2014 11:35:34 +0100
+Subject: [PATCH 9/9] Cancel operations on error returns
+
+The PKCS#11 spec indicates that if errors are returned from
+crypto operation functions, the in-progress operation should
+be terminated.  For example, in section 11.8 (p.140), the
+description of C_Encrypt has:
+  "A call to C_Encrypt always terminates the active encryption
+   operation unless it returns CKR_BUFFER_TOO_SMALL or is a
+   successful call (i.e., one which returns CKR_OK) to determine
+   the length of the buffer needed to hold the ciphertext."
+
+Some errors from these functions (typically CKR_ARGUMENTS_BAD)
+are detected on the client side; to ensure that the chapsd state
+is correctly updated to cancel the operation, we add a collection
+of <Operation>Cancel methods to the D-Bus interface.
+
+There are also some errors detected at the daemon side (in
+particular, the interspersal of one-shot and incremental
+operations); these can just trigger a local call to the appropriate
+<Operation>Cancel function.
+---
+ chaps/chaps.cc                  | 70 +++++++++++++++++++++++++++--------
+ chaps/chaps_adaptor.cc          | 81 +++++++++++++++++++++++++++++++++++++++++
+ chaps/chaps_adaptor.h           | 25 +++++++++++++
+ chaps/chaps_interface.h         | 18 +++++++++
+ chaps/chaps_interface.xml       | 29 +++++++++++++++
+ chaps/chaps_proxy.cc            | 60 ++++++++++++++++++++++++++++++
+ chaps/chaps_proxy.h             | 10 +++++
+ chaps/chaps_proxy_mock.h        | 10 +++++
+ chaps/chaps_service.cc          | 56 ++++++++++++++++++++++++++++
+ chaps/chaps_service.h           | 10 +++++
+ chaps/chaps_service_redirect.cc | 30 +++++++++++++++
+ chaps/chaps_service_redirect.h  | 10 +++++
+ chaps/session.h                 |  2 +
+ chaps/session_impl.cc           | 19 +++++++++-
+ chaps/session_impl.h            |  1 +
+ chaps/session_mock.h            |  1 +
+ 16 files changed, 416 insertions(+), 16 deletions(-)
+
+diff --git a/chaps/chaps.cc b/chaps/chaps.cc
+index 60abdf9..bd9d7df 100644
+--- a/chaps/chaps.cc
++++ b/chaps/chaps.cc
+@@ -722,8 +722,10 @@ CK_RV C_Encrypt(CK_SESSION_HANDLE hSession,
+                 CK_BYTE_PTR pEncryptedData,
+                 CK_ULONG_PTR pulEncryptedDataLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  if ((!pData && ulDataLen > 0) || !pulEncryptedDataLen)
++  if ((!pData && ulDataLen > 0) || !pulEncryptedDataLen) {
++    g_proxy->EncryptCancel(*g_user_isolate, hSession);
+     LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length =
+@@ -752,7 +754,10 @@ CK_RV C_EncryptUpdate(CK_SESSION_HANDLE hSession,
+                       CK_BYTE_PTR pEncryptedPart,
+                       CK_ULONG_PTR pulEncryptedPartLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pPart || !pulEncryptedPartLen, CKR_ARGUMENTS_BAD);
++  if (!pPart || !pulEncryptedPartLen) {
++    g_proxy->EncryptCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length =
+@@ -779,7 +784,10 @@ CK_RV C_EncryptFinal(CK_SESSION_HANDLE hSession,
+                      CK_BYTE_PTR pLastEncryptedPart,
+                      CK_ULONG_PTR pulLastEncryptedPartLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pulLastEncryptedPartLen, CKR_ARGUMENTS_BAD);
++  if (!pulLastEncryptedPartLen) {
++    g_proxy->EncryptCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length =
+@@ -825,8 +833,10 @@ CK_RV C_Decrypt(CK_SESSION_HANDLE hSession,
+                 CK_BYTE_PTR pData,
+                 CK_ULONG_PTR pulDataLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  if ((!pEncryptedData && ulEncryptedDataLen > 0) || !pulDataLen)
++  if ((!pEncryptedData && ulEncryptedDataLen > 0) || !pulDataLen) {
++    g_proxy->DecryptCancel(*g_user_isolate, hSession);
+     LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length = pData ? static_cast<uint64_t>(*pulDataLen) : 0;
+@@ -855,7 +865,10 @@ CK_RV C_DecryptUpdate(CK_SESSION_HANDLE hSession,
+                       CK_BYTE_PTR pPart,
+                       CK_ULONG_PTR pulPartLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pEncryptedPart || !pulPartLen, CKR_ARGUMENTS_BAD);
++  if (!pEncryptedPart || !pulPartLen) {
++    g_proxy->DecryptCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length = pPart ? static_cast<uint64_t>(*pulPartLen) : 0;
+@@ -882,7 +895,10 @@ CK_RV C_DecryptFinal(CK_SESSION_HANDLE hSession,
+                      CK_BYTE_PTR pLastPart,
+                      CK_ULONG_PTR pulLastPartLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pulLastPartLen, CKR_ARGUMENTS_BAD);
++  if (!pulLastPartLen) {
++    g_proxy->DecryptCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length =
+@@ -926,8 +942,10 @@ CK_RV C_Digest(CK_SESSION_HANDLE hSession,
+                CK_BYTE_PTR pDigest,
+                CK_ULONG_PTR pulDigestLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  if ((!pData && ulDataLen > 0) || !pulDigestLen)
++  if ((!pData && ulDataLen > 0) || !pulDigestLen) {
++    g_proxy->DigestCancel(*g_user_isolate, hSession);
+     LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length = pDigest ? static_cast<uint64_t>(*pulDigestLen) : 0;
+@@ -953,7 +971,10 @@ CK_RV C_DigestUpdate(CK_SESSION_HANDLE hSession,
+                      CK_BYTE_PTR pPart,
+                      CK_ULONG ulPartLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pPart, CKR_ARGUMENTS_BAD);
++  if (!pPart) {
++    g_proxy->DigestCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   CK_RV result = g_proxy->DigestUpdate(
+       *g_user_isolate,
+       hSession,
+@@ -977,7 +998,10 @@ CK_RV C_DigestFinal(CK_SESSION_HANDLE hSession,
+                     CK_BYTE_PTR pDigest,
+                     CK_ULONG_PTR pulDigestLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pulDigestLen, CKR_ARGUMENTS_BAD);
++  if (!pulDigestLen) {
++    g_proxy->DigestCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length = pDigest ? static_cast<uint64_t>(*pulDigestLen) : 0;
+@@ -1022,8 +1046,10 @@ CK_RV C_Sign(CK_SESSION_HANDLE hSession,
+              CK_BYTE_PTR pSignature,
+              CK_ULONG_PTR pulSignatureLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  if ((!pData && ulDataLen > 0) || !pulSignatureLen)
++  if ((!pData && ulDataLen > 0) || !pulSignatureLen) {
++    g_proxy->SignCancel(*g_user_isolate, hSession);
+     LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length =
+@@ -1050,7 +1076,10 @@ CK_RV C_SignUpdate(CK_SESSION_HANDLE hSession,
+                    CK_BYTE_PTR pPart,
+                    CK_ULONG ulPartLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pPart, CKR_ARGUMENTS_BAD);
++  if (!pPart) {
++    g_proxy->SignCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   CK_RV result = g_proxy->SignUpdate(*g_user_isolate,
+                                      hSession,
+                                      chaps::ConvertByteBufferToVector(pPart,
+@@ -1065,7 +1094,10 @@ CK_RV C_SignFinal(CK_SESSION_HANDLE hSession,
+                   CK_BYTE_PTR pSignature,
+                   CK_ULONG_PTR pulSignatureLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pulSignatureLen, CKR_ARGUMENTS_BAD);
++  if (!pulSignatureLen) {
++    g_proxy->SignCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   vector<uint8_t> data_out;
+   uint64_t data_out_length;
+   uint64_t max_out_length =
+@@ -1160,8 +1192,10 @@ CK_RV C_Verify(CK_SESSION_HANDLE hSession,
+                CK_BYTE_PTR pSignature,
+                CK_ULONG ulSignatureLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  if (!pSignature || (!pData && ulDataLen > 0))
++  if (!pSignature || (!pData && ulDataLen > 0)) {
++    g_proxy->VerifyCancel(*g_user_isolate, hSession);
+     LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   CK_RV result = g_proxy->Verify(
+       *g_user_isolate,
+       hSession,
+@@ -1177,7 +1211,10 @@ CK_RV C_VerifyUpdate(CK_SESSION_HANDLE hSession,
+                      CK_BYTE_PTR pPart,
+                      CK_ULONG ulPartLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pPart, CKR_ARGUMENTS_BAD);
++  if (!pPart) {
++    g_proxy->VerifyCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   CK_RV result = g_proxy->VerifyUpdate(
+       *g_user_isolate,
+       hSession,
+@@ -1192,7 +1229,10 @@ CK_RV C_VerifyFinal(CK_SESSION_HANDLE hSession,
+                     CK_BYTE_PTR pSignature,
+                     CK_ULONG ulSignatureLen) {
+   LOG_CK_RV_AND_RETURN_IF(!g_is_initialized, CKR_CRYPTOKI_NOT_INITIALIZED);
+-  LOG_CK_RV_AND_RETURN_IF(!pSignature, CKR_ARGUMENTS_BAD);
++  if (!pSignature) {
++    g_proxy->VerifyCancel(*g_user_isolate, hSession);
++    LOG_CK_RV_AND_RETURN(CKR_ARGUMENTS_BAD);
++  }
+   CK_RV result = g_proxy->VerifyFinal(
+       *g_user_isolate,
+       hSession,
+diff --git a/chaps/chaps_adaptor.cc b/chaps/chaps_adaptor.cc
+index 7f3eb2b..fbb87dc 100644
+--- a/chaps/chaps_adaptor.cc
++++ b/chaps/chaps_adaptor.cc
+@@ -1093,6 +1093,22 @@ void ChapsAdaptor::EncryptFinal(const vector<uint8_t>& isolate_credential,
+                actual_out_length, data_out, result);
+ }
+ 
++void ChapsAdaptor::EncryptCancel(const vector<uint8_t>& isolate_credential,
++                                 const uint64_t& session_id) {
++  AutoLock lock(*lock_);
++  VLOG(1) << "CALL: " << __func__;
++  SecureBlob isolate_credential_blob(&isolate_credential.front(),
++                                     isolate_credential.size());
++  ClearVector(const_cast<vector<uint8_t>*>(&isolate_credential));
++  service_->EncryptCancel(isolate_credential_blob, session_id);
++}
++
++void ChapsAdaptor::EncryptCancel(const vector<uint8_t>& isolate_credential,
++                                 const uint64_t& session_id,
++                                 ::DBus::Error& /*error*/) {
++  EncryptCancel(isolate_credential, session_id);
++}
++
+ uint32_t ChapsAdaptor::DecryptInit(
+     const vector<uint8_t>& isolate_credential,
+     const uint64_t& session_id,
+@@ -1232,6 +1248,22 @@ void ChapsAdaptor::DecryptFinal(const vector<uint8_t>& isolate_credential,
+                actual_out_length, data_out, result);
+ }
+ 
++void ChapsAdaptor::DecryptCancel(const vector<uint8_t>& isolate_credential,
++                                 const uint64_t& session_id) {
++  AutoLock lock(*lock_);
++  VLOG(1) << "CALL: " << __func__;
++  SecureBlob isolate_credential_blob(&isolate_credential.front(),
++                                     isolate_credential.size());
++  ClearVector(const_cast<vector<uint8_t>*>(&isolate_credential));
++  service_->DecryptCancel(isolate_credential_blob, session_id);
++}
++
++void ChapsAdaptor::DecryptCancel(const vector<uint8_t>& isolate_credential,
++                                 const uint64_t& session_id,
++                                 ::DBus::Error& /*error*/) {
++  DecryptCancel(isolate_credential, session_id);
++}
++
+ uint32_t ChapsAdaptor::DigestInit(
+     const vector<uint8_t>& isolate_credential,
+     const uint64_t& session_id,
+@@ -1375,6 +1407,22 @@ void ChapsAdaptor::DigestFinal(const vector<uint8_t>& isolate_credential,
+               digest, result);
+ }
+ 
++void ChapsAdaptor::DigestCancel(const vector<uint8_t>& isolate_credential,
++                                const uint64_t& session_id) {
++  AutoLock lock(*lock_);
++  VLOG(1) << "CALL: " << __func__;
++  SecureBlob isolate_credential_blob(&isolate_credential.front(),
++                                     isolate_credential.size());
++  ClearVector(const_cast<vector<uint8_t>*>(&isolate_credential));
++  service_->DigestCancel(isolate_credential_blob, session_id);
++}
++
++void ChapsAdaptor::DigestCancel(const vector<uint8_t>& isolate_credential,
++                                const uint64_t& session_id,
++                                ::DBus::Error& /*error*/) {
++  DigestCancel(isolate_credential, session_id);
++}
++
+ uint32_t ChapsAdaptor::SignInit(const vector<uint8_t>& isolate_credential,
+                                 const uint64_t& session_id,
+                                 const uint64_t& mechanism_type,
+@@ -1497,6 +1545,22 @@ void ChapsAdaptor::SignFinal(const vector<uint8_t>& isolate_credential,
+             signature, result);
+ }
+ 
++void ChapsAdaptor::SignCancel(const vector<uint8_t>& isolate_credential,
++                              const uint64_t& session_id) {
++  AutoLock lock(*lock_);
++  VLOG(1) << "CALL: " << __func__;
++  SecureBlob isolate_credential_blob(&isolate_credential.front(),
++                                     isolate_credential.size());
++  ClearVector(const_cast<vector<uint8_t>*>(&isolate_credential));
++  service_->SignCancel(isolate_credential_blob, session_id);
++}
++
++void ChapsAdaptor::SignCancel(const vector<uint8_t>& isolate_credential,
++                              const uint64_t& session_id,
++                              ::DBus::Error& /*error*/) {
++  SignCancel(isolate_credential, session_id);
++}
++
+ uint32_t ChapsAdaptor::SignRecoverInit(
+       const vector<uint8_t>& isolate_credential,
+       const uint64_t& session_id,
+@@ -1665,6 +1729,23 @@ uint32_t ChapsAdaptor::VerifyFinal(const vector<uint8_t>& isolate_credential,
+   return VerifyFinal(isolate_credential, session_id, signature);
+ }
+ 
++void ChapsAdaptor::VerifyCancel(const vector<uint8_t>& isolate_credential,
++                                const uint64_t& session_id) {
++  AutoLock lock(*lock_);
++  VLOG(1) << "CALL: " << __func__;
++  SecureBlob isolate_credential_blob(&isolate_credential.front(),
++                                     isolate_credential.size());
++  ClearVector(const_cast<vector<uint8_t>*>(&isolate_credential));
++  service_->VerifyCancel(isolate_credential_blob, session_id);
++}
++
++void ChapsAdaptor::VerifyCancel(const vector<uint8_t>& isolate_credential,
++                                const uint64_t& session_id,
++                                ::DBus::Error& /*error*/) {
++  VerifyCancel(isolate_credential, session_id);
++}
++
++
+ uint32_t ChapsAdaptor::VerifyRecoverInit(
+       const vector<uint8_t>& isolate_credential,
+       const uint64_t& session_id,
+diff --git a/chaps/chaps_adaptor.h b/chaps/chaps_adaptor.h
+index 74b1cb6..2d95b59 100644
+--- a/chaps/chaps_adaptor.h
++++ b/chaps/chaps_adaptor.h
+@@ -257,6 +257,9 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                             std::vector<uint8_t>& data_out,  // NOLINT - refs
+                             uint32_t& result,  // NOLINT - refs
+                             ::DBus::Error& error);  // NOLINT - refs
++  virtual void EncryptCancel(const std::vector<uint8_t>& isolate_credential,
++                             const uint64_t& session_id,
++                             ::DBus::Error& error);  // NOLINT - refs
+   virtual uint32_t DecryptInit(const std::vector<uint8_t>& isolate_credential,
+                                const uint64_t& session_id,
+                                const uint64_t& mechanism_type,
+@@ -286,6 +289,9 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                             std::vector<uint8_t>& data_out,  // NOLINT - refs
+                             uint32_t& result,  // NOLINT - refs
+                             ::DBus::Error& error);  // NOLINT - refs
++  virtual void DecryptCancel(const std::vector<uint8_t>& isolate_credential,
++                             const uint64_t& session_id,
++                             ::DBus::Error& error);  // NOLINT - refs
+   virtual uint32_t DigestInit(const std::vector<uint8_t>& isolate_credential,
+                               const uint64_t& session_id,
+                               const uint64_t& mechanism_type,
+@@ -314,6 +320,9 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                            std::vector<uint8_t>& digest,  // NOLINT - refs
+                            uint32_t& result,  // NOLINT - refs
+                            ::DBus::Error& error);  // NOLINT - refs
++  virtual void DigestCancel(const std::vector<uint8_t>& isolate_credential,
++                            const uint64_t& session_id,
++                            ::DBus::Error& error);  // NOLINT - refs
+   virtual uint32_t SignInit(const std::vector<uint8_t>& isolate_credential,
+                             const uint64_t& session_id,
+                             const uint64_t& mechanism_type,
+@@ -339,6 +348,9 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                          std::vector<uint8_t>& signature,  // NOLINT - refs
+                          uint32_t& result,  // NOLINT - refs
+                          ::DBus::Error& error);  // NOLINT - refs
++  virtual void SignCancel(const std::vector<uint8_t>& isolate_credential,
++                          const uint64_t& session_id,
++                          ::DBus::Error& error);  // NOLINT - refs
+   virtual uint32_t SignRecoverInit(
+       const std::vector<uint8_t>& isolate_credential,
+       const uint64_t& session_id,
+@@ -373,6 +385,9 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                                const uint64_t& session_id,
+                                const std::vector<uint8_t>& signature,
+                                ::DBus::Error& error);  // NOLINT - refs
++  virtual void VerifyCancel(const std::vector<uint8_t>& isolate_credential,
++                            const uint64_t& session_id,
++                            ::DBus::Error& error);  // NOLINT - refs
+   virtual uint32_t VerifyRecoverInit(
+       const std::vector<uint8_t>& isolate_credential,
+       const uint64_t& session_id,
+@@ -670,6 +685,8 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                             uint64_t& actual_out_length,  // NOLINT - refs
+                             std::vector<uint8_t>& data_out,  // NOLINT - refs
+                             uint32_t& result);  // NOLINT - refs
++  virtual void EncryptCancel(const std::vector<uint8_t>& isolate_credential,
++                             const uint64_t& session_id);
+   virtual uint32_t DecryptInit(const std::vector<uint8_t>& isolate_credential,
+                                const uint64_t& session_id,
+                                const uint64_t& mechanism_type,
+@@ -695,6 +712,8 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                             uint64_t& actual_out_length,  // NOLINT - refs
+                             std::vector<uint8_t>& data_out,  // NOLINT - refs
+                             uint32_t& result);  // NOLINT - refs
++  virtual void DecryptCancel(const std::vector<uint8_t>& isolate_credential,
++                             const uint64_t& session_id);
+   virtual uint32_t DigestInit(const std::vector<uint8_t>& isolate_credential,
+                               const uint64_t& session_id,
+                               const uint64_t& mechanism_type,
+@@ -718,6 +737,8 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                            uint64_t& actual_out_length,  // NOLINT - refs
+                            std::vector<uint8_t>& digest,  // NOLINT - refs
+                            uint32_t& result);  // NOLINT - refs
++  virtual void DigestCancel(const std::vector<uint8_t>& isolate_credential,
++                            const uint64_t& session_id);
+   virtual uint32_t SignInit(const std::vector<uint8_t>& isolate_credential,
+                             const uint64_t& session_id,
+                             const uint64_t& mechanism_type,
+@@ -739,6 +760,8 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+                          uint64_t& actual_out_length,  // NOLINT - refs
+                          std::vector<uint8_t>& signature,  // NOLINT - refs
+                          uint32_t& result);  // NOLINT - refs
++  virtual void SignCancel(const std::vector<uint8_t>& isolate_credential,
++                          const uint64_t& session_id);
+   virtual uint32_t SignRecoverInit(
+       const std::vector<uint8_t>& isolate_credential,
+       const uint64_t& session_id,
+@@ -767,6 +790,8 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
+   virtual uint32_t VerifyFinal(const std::vector<uint8_t>& isolate_credential,
+                                const uint64_t& session_id,
+                                const std::vector<uint8_t>& signature);
++  virtual void VerifyCancel(const std::vector<uint8_t>& isolate_credential,
++                            const uint64_t& session_id);
+   virtual uint32_t VerifyRecoverInit(
+       const std::vector<uint8_t>& isolate_credential,
+       const uint64_t& session_id,
+diff --git a/chaps/chaps_interface.h b/chaps/chaps_interface.h
+index 8a8c527..cb05f3e 100644
+--- a/chaps/chaps_interface.h
++++ b/chaps/chaps_interface.h
+@@ -208,6 +208,10 @@ class ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out) = 0;
++  // PKCS #11 v2.20 section 11.8 page 140,142: any errors terminate the active
++  // encryption operation.
++  virtual void EncryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id) = 0;
+   // PKCS #11 v2.20 section 11.9 page 144.
+   virtual uint32_t DecryptInit(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+@@ -234,6 +238,10 @@ class ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out) = 0;
++  // PKCS #11 v2.20 section 11.9 page 145,146: any errors terminate the active
++  // decryption operation.
++  virtual void DecryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id) = 0;
+   // PKCS #11 v2.20 section 11.10 page 148.
+   virtual uint32_t DigestInit(
+       const chromeos::SecureBlob& isolate_credential,
+@@ -261,6 +269,10 @@ class ChapsInterface {
+                                uint64_t max_out_length,
+                                uint64_t* actual_out_length,
+                                std::vector<uint8_t>* digest) = 0;
++  // PKCS #11 v2.20 section 11.10 page 149,151: any errors terminate the active
++  // digest operation.
++  virtual void DigestCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id) = 0;
+   // PKCS #11 v2.20 section 11.11 page 152.
+   virtual uint32_t SignInit(const chromeos::SecureBlob& isolate_credential,
+                             uint64_t session_id,
+@@ -284,6 +296,10 @@ class ChapsInterface {
+                              uint64_t max_out_length,
+                              uint64_t* actual_out_length,
+                              std::vector<uint8_t>* signature) = 0;
++  // PKCS #11 v2.20 section 11.11 page 153,154: any errors terminate the active
++  // signing operation.
++  virtual void SignCancel(const chromeos::SecureBlob& isolate_credential,
++                          uint64_t session_id) = 0;
+   // PKCS #11 v2.20 section 11.11 page 155.
+   virtual uint32_t SignRecoverInit(
+      const chromeos::SecureBlob& isolate_credential,
+@@ -317,6 +333,8 @@ class ChapsInterface {
+   virtual uint32_t VerifyFinal(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+                                const std::vector<uint8_t>& signature) = 0;
++  virtual void VerifyCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id) = 0;
+   // PKCS #11 v2.20 section 11.12 page 161.
+   virtual uint32_t VerifyRecoverInit(
+       const chromeos::SecureBlob& isolate_credential,
+diff --git a/chaps/chaps_interface.xml b/chaps/chaps_interface.xml
+index 80fc2e6..a442f29 100644
+--- a/chaps/chaps_interface.xml
++++ b/chaps/chaps_interface.xml
+@@ -440,6 +440,12 @@
+       </arg>
+     </method>
+ 
++    <!-- PKCS #11 v2.20 section 11.8 page 140,142 (implicit). -->
++    <method name="EncryptCancel">
++      <arg type="ay" name="isolate_credential" direction="in"/>
++      <arg type="t" name="session_id" direction="in"/>
++    </method>
++
+     <!-- PKCS #11 v2.20 section 11.9 page 144. -->
+     <method name="DecryptInit">
+       <arg type="ay" name="isolate_credential" direction="in"/>
+@@ -490,6 +496,12 @@
+       </arg>
+     </method>
+ 
++    <!-- PKCS #11 v2.20 section 11.9 page 145,146 (implicit). -->
++    <method name="DecryptCancel">
++      <arg type="ay" name="isolate_credential" direction="in"/>
++      <arg type="t" name="session_id" direction="in"/>
++    </method>
++
+     <!-- PKCS #11 v2.20 section 11.10 page 148. -->
+     <method name="DigestInit">
+       <arg type="ay" name="isolate_credential" direction="in"/>
+@@ -546,6 +558,12 @@
+       </arg>
+     </method>
+ 
++    <!-- PKCS #11 v2.20 section 11.10 page 149,151 (implicit). -->
++    <method name="DigestCancel">
++      <arg type="ay" name="isolate_credential" direction="in"/>
++      <arg type="t" name="session_id" direction="in"/>
++    </method>
++
+     <!-- PKCS #11 v2.20 section 11.11 page 152. -->
+     <method name="SignInit">
+       <arg type="ay" name="isolate_credential" direction="in"/>
+@@ -593,6 +611,12 @@
+       </arg>
+     </method>
+ 
++    <!-- PKCS #11 v2.20 section 11.11 page 153,154 (implicit). -->
++    <method name="SignCancel">
++      <arg type="ay" name="isolate_credential" direction="in"/>
++      <arg type="t" name="session_id" direction="in"/>
++    </method>
++
+     <!-- PKCS #11 v2.20 section 11.11 page 155. -->
+     <method name="SignRecoverInit">
+       <arg type="ay" name="isolate_credential" direction="in"/>
+@@ -661,6 +685,11 @@
+       </arg>
+     </method>
+ 
++    <method name="VerifyCancel">
++      <arg type="ay" name="isolate_credential" direction="in"/>
++      <arg type="t" name="session_id" direction="in"/>
++    </method>
++
+     <!-- PKCS #11 v2.20 section 11.12 page 161. -->
+     <method name="VerifyRecoverInit">
+       <arg type="ay" name="isolate_credential" direction="in"/>
+diff --git a/chaps/chaps_proxy.cc b/chaps/chaps_proxy.cc
+index f950234..09d4769 100644
+--- a/chaps/chaps_proxy.cc
++++ b/chaps/chaps_proxy.cc
+@@ -788,6 +788,18 @@ uint32_t ChapsProxyImpl::EncryptFinal(const SecureBlob& isolate_credential,
+   return result;
+ }
+ 
++void ChapsProxyImpl::EncryptCancel(const SecureBlob& isolate_credential,
++                                   uint64_t session_id) {
++  AutoLock lock(lock_);
++  if (!proxy_.get())
++    return;
++  try {
++    proxy_->EncryptCancel(isolate_credential, session_id);
++  } catch (DBus::Error err) {
++    LOG(ERROR) << "DBus::Error - " << err.what();
++  }
++}
++
+ uint32_t ChapsProxyImpl::DecryptInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -883,6 +895,18 @@ uint32_t ChapsProxyImpl::DecryptFinal(const SecureBlob& isolate_credential,
+   return result;
+ }
+ 
++void ChapsProxyImpl::DecryptCancel(const SecureBlob& isolate_credential,
++                                   uint64_t session_id) {
++  AutoLock lock(lock_);
++  if (!proxy_.get())
++    return;
++  try {
++    proxy_->DecryptCancel(isolate_credential, session_id);
++  } catch (DBus::Error err) {
++    LOG(ERROR) << "DBus::Error - " << err.what();
++  }
++}
++
+ uint32_t ChapsProxyImpl::DigestInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -979,6 +1003,18 @@ uint32_t ChapsProxyImpl::DigestFinal(const SecureBlob& isolate_credential,
+   return result;
+ }
+ 
++void ChapsProxyImpl::DigestCancel(const SecureBlob& isolate_credential,
++                                  uint64_t session_id) {
++  AutoLock lock(lock_);
++  if (!proxy_.get())
++    return;
++  try {
++    proxy_->DigestCancel(isolate_credential, session_id);
++  } catch (DBus::Error err) {
++    LOG(ERROR) << "DBus::Error - " << err.what();
++  }
++}
++
+ uint32_t ChapsProxyImpl::SignInit(const SecureBlob& isolate_credential,
+                                   uint64_t session_id,
+                                   uint64_t mechanism_type,
+@@ -1061,6 +1097,18 @@ uint32_t ChapsProxyImpl::SignFinal(const SecureBlob& isolate_credential,
+   return result;
+ }
+ 
++void ChapsProxyImpl::SignCancel(const SecureBlob& isolate_credential,
++                                uint64_t session_id) {
++  AutoLock lock(lock_);
++  if (!proxy_.get())
++    return;
++  try {
++    proxy_->SignCancel(isolate_credential, session_id);
++  } catch (DBus::Error err) {
++    LOG(ERROR) << "DBus::Error - " << err.what();
++  }
++}
++
+ uint32_t ChapsProxyImpl::SignRecoverInit(
+       const SecureBlob& isolate_credential,
+       uint64_t session_id,
+@@ -1174,6 +1222,18 @@ uint32_t ChapsProxyImpl::VerifyFinal(const SecureBlob& isolate_credential,
+   return result;
+ }
+ 
++void ChapsProxyImpl::VerifyCancel(const SecureBlob& isolate_credential,
++                                  uint64_t session_id) {
++  AutoLock lock(lock_);
++  if (!proxy_.get())
++    return;
++  try {
++    proxy_->VerifyCancel(isolate_credential, session_id);
++  } catch (DBus::Error err) {
++    LOG(ERROR) << "DBus::Error - " << err.what();
++  }
++}
++
+ uint32_t ChapsProxyImpl::VerifyRecoverInit(
+       const SecureBlob& isolate_credential,
+       uint64_t session_id,
+diff --git a/chaps/chaps_proxy.h b/chaps/chaps_proxy.h
+index 7236b40..83226f3 100644
+--- a/chaps/chaps_proxy.h
++++ b/chaps/chaps_proxy.h
+@@ -197,6 +197,8 @@ class ChapsProxyImpl : public ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out);
++  virtual void EncryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id);
+   virtual uint32_t DecryptInit(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+                                uint64_t mechanism_type,
+@@ -219,6 +221,8 @@ class ChapsProxyImpl : public ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out);
++  virtual void DecryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id);
+   virtual uint32_t DigestInit(const chromeos::SecureBlob& isolate_credential,
+                               uint64_t session_id,
+                               uint64_t mechanism_type,
+@@ -240,6 +244,8 @@ class ChapsProxyImpl : public ChapsInterface {
+                                uint64_t max_out_length,
+                                uint64_t* actual_out_length,
+                                std::vector<uint8_t>* digest);
++  virtual void DigestCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id);
+   virtual uint32_t SignInit(const chromeos::SecureBlob& isolate_credential,
+                             uint64_t session_id,
+                             uint64_t mechanism_type,
+@@ -259,6 +265,8 @@ class ChapsProxyImpl : public ChapsInterface {
+                              uint64_t max_out_length,
+                              uint64_t* actual_out_length,
+                              std::vector<uint8_t>* signature);
++  virtual void SignCancel(const chromeos::SecureBlob& isolate_credential,
++                          uint64_t session_id);
+   virtual uint32_t SignRecoverInit(
+       const chromeos::SecureBlob& isolate_credential,
+       uint64_t session_id,
+@@ -286,6 +294,8 @@ class ChapsProxyImpl : public ChapsInterface {
+   virtual uint32_t VerifyFinal(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+                                const std::vector<uint8_t>& signature);
++  virtual void VerifyCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id);
+   virtual uint32_t VerifyRecoverInit(
+       const chromeos::SecureBlob& isolate_credential,
+       uint64_t session_id,
+diff --git a/chaps/chaps_proxy_mock.h b/chaps/chaps_proxy_mock.h
+index 342e4bb..7d5ad32 100644
+--- a/chaps/chaps_proxy_mock.h
++++ b/chaps/chaps_proxy_mock.h
+@@ -149,6 +149,8 @@ class ChapsProxyMock : public ChapsInterface {
+                                       uint64_t,
+                                       uint64_t*,
+                                       std::vector<uint8_t>*));
++  MOCK_METHOD2(EncryptCancel, void(const chromeos::SecureBlob&,
++                                   uint64_t));
+   MOCK_METHOD5(DecryptInit, uint32_t(const chromeos::SecureBlob&,
+                                      uint64_t,
+                                      uint64_t,
+@@ -171,6 +173,8 @@ class ChapsProxyMock : public ChapsInterface {
+                                       uint64_t,
+                                       uint64_t*,
+                                       std::vector<uint8_t>*));
++  MOCK_METHOD2(DecryptCancel, void(const chromeos::SecureBlob&,
++                                   uint64_t));
+   MOCK_METHOD4(DigestInit, uint32_t(const chromeos::SecureBlob&,
+                                     uint64_t,
+                                     uint64_t,
+@@ -192,6 +196,8 @@ class ChapsProxyMock : public ChapsInterface {
+                                      uint64_t,
+                                      uint64_t*,
+                                      std::vector<uint8_t>*));
++  MOCK_METHOD2(DigestCancel, void(const chromeos::SecureBlob&,
++                                  uint64_t));
+   MOCK_METHOD5(SignInit, uint32_t(const chromeos::SecureBlob&,
+                                   uint64_t,
+                                   uint64_t,
+@@ -211,6 +217,8 @@ class ChapsProxyMock : public ChapsInterface {
+                                    uint64_t,
+                                    uint64_t*,
+                                    std::vector<uint8_t>*));
++  MOCK_METHOD2(SignCancel, void(const chromeos::SecureBlob&,
++                                uint64_t));
+   MOCK_METHOD5(SignRecoverInit, uint32_t(const chromeos::SecureBlob&,
+                                          uint64_t,
+                                          uint64_t,
+@@ -237,6 +245,8 @@ class ChapsProxyMock : public ChapsInterface {
+   MOCK_METHOD3(VerifyFinal, uint32_t(const chromeos::SecureBlob&,
+                                      uint64_t,
+                                      const std::vector<uint8_t>&));
++  MOCK_METHOD2(VerifyCancel, void(const chromeos::SecureBlob&,
++                                  uint64_t));
+   MOCK_METHOD5(VerifyRecoverInit, uint32_t(const chromeos::SecureBlob&,
+                                            uint64_t,
+                                            uint64_t,
+diff --git a/chaps/chaps_service.cc b/chaps/chaps_service.cc
+index 5ba8165..e532f7e 100644
+--- a/chaps/chaps_service.cc
++++ b/chaps/chaps_service.cc
+@@ -648,6 +648,17 @@ uint32_t ChapsServiceImpl::EncryptFinal(const SecureBlob& isolate_credential,
+       PreservedByteVector(data_out));
+ }
+ 
++void ChapsServiceImpl::EncryptCancel(const SecureBlob& isolate_credential,
++                                     uint64_t session_id) {
++  Session* session = NULL;
++  if (!slot_manager_->GetSession(isolate_credential,
++                                 session_id,
++                                 &session))
++    return;
++  CHECK(session);
++  return session->OperationCancel(kEncrypt);
++}
++
+ uint32_t ChapsServiceImpl::DecryptInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -732,6 +743,18 @@ uint32_t ChapsServiceImpl::DecryptFinal(const SecureBlob& isolate_credential,
+       PreservedByteVector(data_out));
+ }
+ 
++void ChapsServiceImpl::DecryptCancel(const SecureBlob& isolate_credential,
++                                     uint64_t session_id) {
++  Session* session = NULL;
++  if (!slot_manager_->GetSession(isolate_credential,
++                                 session_id,
++                                 &session))
++    return;
++  CHECK(session);
++  return session->OperationCancel(kDecrypt);
++}
++
++
+ uint32_t ChapsServiceImpl::DigestInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -811,6 +834,17 @@ uint32_t ChapsServiceImpl::DigestFinal(const SecureBlob& isolate_credential,
+       PreservedByteVector(digest));
+ }
+ 
++void ChapsServiceImpl::DigestCancel(const SecureBlob& isolate_credential,
++                                    uint64_t session_id) {
++  Session* session = NULL;
++  if (!slot_manager_->GetSession(isolate_credential,
++                                 session_id,
++                                 &session))
++    return;
++  CHECK(session);
++  session->OperationCancel(kDigest);
++}
++
+ uint32_t ChapsServiceImpl::SignInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -888,6 +922,17 @@ uint32_t ChapsServiceImpl::SignFinal(const SecureBlob& isolate_credential,
+       PreservedByteVector(signature));
+ }
+ 
++void ChapsServiceImpl::SignCancel(const SecureBlob& isolate_credential,
++                                  uint64_t session_id) {
++  Session* session = NULL;
++  if (!slot_manager_->GetSession(isolate_credential,
++                                 session_id,
++                                 &session))
++    return;
++  CHECK(session);
++  return session->OperationCancel(kSign);
++}
++
+ uint32_t ChapsServiceImpl::SignRecoverInit(
+       const SecureBlob& isolate_credential,
+       uint64_t session_id,
+@@ -965,6 +1010,17 @@ uint32_t ChapsServiceImpl::VerifyFinal(const SecureBlob& isolate_credential,
+   return session->VerifyFinal(ConvertByteVectorToString(signature));
+ }
+ 
++void ChapsServiceImpl::VerifyCancel(const SecureBlob& isolate_credential,
++                                    uint64_t session_id) {
++  Session* session = NULL;
++  if (!slot_manager_->GetSession(isolate_credential,
++                                 session_id,
++                                 &session))
++    return;
++  CHECK(session);
++  return session->OperationCancel(kVerify);
++}
++
+ uint32_t ChapsServiceImpl::VerifyRecoverInit(
+       const SecureBlob& isolate_credential,
+       uint64_t session_id,
+diff --git a/chaps/chaps_service.h b/chaps/chaps_service.h
+index 8b1dcfe..46b462c 100644
+--- a/chaps/chaps_service.h
++++ b/chaps/chaps_service.h
+@@ -173,6 +173,8 @@ class ChapsServiceImpl : public ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out);
++  virtual void EncryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id);
+   virtual uint32_t DecryptInit(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+                                uint64_t mechanism_type,
+@@ -195,6 +197,8 @@ class ChapsServiceImpl : public ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out);
++  virtual void DecryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id);
+   virtual uint32_t DigestInit(const chromeos::SecureBlob& isolate_credential,
+                               uint64_t session_id,
+                               uint64_t mechanism_type,
+@@ -216,6 +220,8 @@ class ChapsServiceImpl : public ChapsInterface {
+                                uint64_t max_out_length,
+                                uint64_t* actual_out_length,
+                                std::vector<uint8_t>* digest);
++  virtual void DigestCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id);
+   virtual uint32_t SignInit(const chromeos::SecureBlob& isolate_credential,
+                             uint64_t session_id,
+                             uint64_t mechanism_type,
+@@ -235,6 +241,8 @@ class ChapsServiceImpl : public ChapsInterface {
+                              uint64_t max_out_length,
+                              uint64_t* actual_out_length,
+                              std::vector<uint8_t>* signature);
++  virtual void SignCancel(const chromeos::SecureBlob& isolate_credential,
++                          uint64_t session_id);
+   virtual uint32_t SignRecoverInit(
+       const chromeos::SecureBlob& isolate_credential,
+       uint64_t session_id,
+@@ -262,6 +270,8 @@ class ChapsServiceImpl : public ChapsInterface {
+   virtual uint32_t VerifyFinal(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+                                const std::vector<uint8_t>& signature);
++  virtual void VerifyCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id);
+   virtual uint32_t VerifyRecoverInit(
+       const chromeos::SecureBlob& isolate_credential,
+       uint64_t session_id,
+diff --git a/chaps/chaps_service_redirect.cc b/chaps/chaps_service_redirect.cc
+index e999df9..38e8e10 100644
+--- a/chaps/chaps_service_redirect.cc
++++ b/chaps/chaps_service_redirect.cc
+@@ -659,6 +659,12 @@ uint32_t ChapsServiceRedirect::EncryptFinal(
+   return CKR_OK;
+ }
+ 
++void ChapsServiceRedirect::EncryptCancel(
++      const SecureBlob& isolate_credential,
++      uint64_t session_id) {
++  LOG(ERROR) << "Unexpected cancel operation";
++}
++
+ uint32_t ChapsServiceRedirect::DecryptInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -763,6 +769,12 @@ uint32_t ChapsServiceRedirect::DecryptFinal(
+   return CKR_OK;
+ }
+ 
++void ChapsServiceRedirect::DecryptCancel(
++      const SecureBlob& isolate_credential,
++      uint64_t session_id) {
++  LOG(ERROR) << "Unexpected cancel operation";
++}
++
+ uint32_t ChapsServiceRedirect::DigestInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -854,6 +866,12 @@ uint32_t ChapsServiceRedirect::DigestFinal(const SecureBlob& isolate_credential,
+   return CKR_OK;
+ }
+ 
++void ChapsServiceRedirect::DigestCancel(
++      const SecureBlob& isolate_credential,
++      uint64_t session_id) {
++  LOG(ERROR) << "Unexpected cancel operation";
++}
++
+ uint32_t ChapsServiceRedirect::SignInit(
+     const SecureBlob& isolate_credential,
+     uint64_t session_id,
+@@ -936,6 +954,12 @@ uint32_t ChapsServiceRedirect::SignFinal(const SecureBlob& isolate_credential,
+   return CKR_OK;
+ }
+ 
++void ChapsServiceRedirect::SignCancel(
++      const SecureBlob& isolate_credential,
++      uint64_t session_id) {
++  LOG(ERROR) << "Unexpected cancel operation";
++}
++
+ uint32_t ChapsServiceRedirect::SignRecoverInit(
+       const SecureBlob& isolate_credential,
+       uint64_t session_id,
+@@ -1046,6 +1070,12 @@ uint32_t ChapsServiceRedirect::VerifyFinal(const SecureBlob& isolate_credential,
+   return CKR_OK;
+ }
+ 
++void ChapsServiceRedirect::VerifyCancel(
++      const SecureBlob& isolate_credential,
++      uint64_t session_id) {
++  LOG(ERROR) << "Unexpected cancel operation";
++}
++
+ uint32_t ChapsServiceRedirect::VerifyRecoverInit(
+       const SecureBlob& isolate_credential,
+       uint64_t session_id,
+diff --git a/chaps/chaps_service_redirect.h b/chaps/chaps_service_redirect.h
+index bbf0ec6..daedd17 100644
+--- a/chaps/chaps_service_redirect.h
++++ b/chaps/chaps_service_redirect.h
+@@ -175,6 +175,8 @@ class ChapsServiceRedirect : public ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out);
++  virtual void EncryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id);
+   virtual uint32_t DecryptInit(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+                                uint64_t mechanism_type,
+@@ -197,6 +199,8 @@ class ChapsServiceRedirect : public ChapsInterface {
+                                 uint64_t max_out_length,
+                                 uint64_t* actual_out_length,
+                                 std::vector<uint8_t>* data_out);
++  virtual void DecryptCancel(const chromeos::SecureBlob& isolate_credential,
++                             uint64_t session_id);
+   virtual uint32_t DigestInit(const chromeos::SecureBlob& isolate_credential,
+                               uint64_t session_id,
+                               uint64_t mechanism_type,
+@@ -218,6 +222,8 @@ class ChapsServiceRedirect : public ChapsInterface {
+                                uint64_t max_out_length,
+                                uint64_t* actual_out_length,
+                                std::vector<uint8_t>* digest);
++  virtual void DigestCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id);
+   virtual uint32_t SignInit(const chromeos::SecureBlob& isolate_credential,
+                             uint64_t session_id,
+                             uint64_t mechanism_type,
+@@ -237,6 +243,8 @@ class ChapsServiceRedirect : public ChapsInterface {
+                              uint64_t max_out_length,
+                              uint64_t* actual_out_length,
+                              std::vector<uint8_t>* signature);
++  virtual void SignCancel(const chromeos::SecureBlob& isolate_credential,
++                          uint64_t session_id);
+   virtual uint32_t SignRecoverInit(
+       const chromeos::SecureBlob& isolate_credential,
+       uint64_t session_id,
+@@ -264,6 +272,8 @@ class ChapsServiceRedirect : public ChapsInterface {
+   virtual uint32_t VerifyFinal(const chromeos::SecureBlob& isolate_credential,
+                                uint64_t session_id,
+                                const std::vector<uint8_t>& signature);
++  virtual void VerifyCancel(const chromeos::SecureBlob& isolate_credential,
++                            uint64_t session_id);
+   virtual uint32_t VerifyRecoverInit(
+       const chromeos::SecureBlob& isolate_credential,
+       uint64_t session_id,
+diff --git a/chaps/session.h b/chaps/session.h
+index dab76fb..c08caab 100644
+--- a/chaps/session.h
++++ b/chaps/session.h
+@@ -93,6 +93,8 @@ class Session {
+   virtual CK_RV OperationFinal(OperationType operation,
+                                int* required_out_length,
+                                std::string* data_out) = 0;
++  // Cancels an operation that is already active (like C_EncryptUpdate).
++  virtual void OperationCancel(OperationType operation) = 0;
+   // Finalizes a signature verification operation (like C_VerifyFinal).
+   virtual CK_RV VerifyFinal(const std::string& signature) = 0;
+   // Performs an entire operation in a single step (like C_Encrypt). This is
+diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
+index af625c0..cc3530d 100644
+--- a/chaps/session_impl.cc
++++ b/chaps/session_impl.cc
+@@ -282,6 +282,7 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
+   }
+   if (context->is_single_) {
+     LOG(ERROR) << "Operation is not incremental.";
++    OperationCancel(operation);
+     return CKR_OPERATION_ACTIVE;
+   }
+   context->is_incremental_ = true;
+@@ -313,6 +314,20 @@ CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
+   return CKR_OK;
+ }
+ 
++void SessionImpl::OperationCancel(OperationType operation) {
++  CHECK(operation < kNumOperationTypes);
++  OperationContext* context = &operation_context_[operation];
++  if (!context->is_valid_) {
++    LOG(ERROR) << "Operation is not initialized.";
++    return;
++  }
++  int out_length = 0;
++  OperationFinalInternal(operation, &out_length, NULL);
++
++  // Drop the context even though the data is still pending.
++  context->is_valid_ = false;
++}
++
+ CK_RV SessionImpl::OperationFinal(OperationType operation,
+                                   int* required_out_length,
+                                   string* data_out) {
+@@ -326,6 +341,7 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
+   }
+   if (context->is_single_) {
+     LOG(ERROR) << "Operation is not incremental.";
++    OperationCancel(operation);
+     return CKR_OPERATION_ACTIVE;
+   }
+   context->is_incremental_ = true;
+@@ -950,7 +966,8 @@ CK_RV SessionImpl::GetOperationOutput(OperationContext* context,
+   *required_out_length = out_length;
+   if (max_length < out_length)
+     return CKR_BUFFER_TOO_SMALL;
+-  *data_out = context->data_;
++  if (data_out)
++    *data_out = context->data_;
+   context->data_.clear();
+   return CKR_OK;
+ }
+diff --git a/chaps/session_impl.h b/chaps/session_impl.h
+index 7dcb735..f3c0057 100644
+--- a/chaps/session_impl.h
++++ b/chaps/session_impl.h
+@@ -80,6 +80,7 @@ class SessionImpl : public Session {
+   virtual CK_RV OperationFinal(OperationType operation,
+                                int* required_out_length,
+                                std::string* data_out);
++  virtual void OperationCancel(OperationType operation);
+   virtual CK_RV VerifyFinal(const std::string& signature);
+   virtual CK_RV OperationSinglePart(OperationType operation,
+                                     const std::string& data_in,
+diff --git a/chaps/session_mock.h b/chaps/session_mock.h
+index 0bf6d07..d646a48 100644
+--- a/chaps/session_mock.h
++++ b/chaps/session_mock.h
+@@ -49,6 +49,7 @@ class SessionMock : public Session {
+                                       int*,
+                                       std::string*));
+   MOCK_METHOD3(OperationFinal, CK_RV(OperationType, int*, std::string*));
++  MOCK_METHOD1(OperationCancel, void(OperationType));
+   MOCK_METHOD1(VerifyFinal, CK_RV(const std::string&));
+   MOCK_METHOD4(OperationSinglePart, CK_RV(OperationType,
+                                           const std::string&,
+-- 
+1.9.1
+
