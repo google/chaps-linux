@@ -1,4 +1,4 @@
-From d93952fe1eaeb179b6de62a7045f47398e1a3b9c Mon Sep 17 00:00:00 2001
+From 98f93c3671d9517397912d44147a7f6f6238018a Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 3 Oct 2014 11:35:34 +0100
 Subject: [PATCH 9/9] Cancel operations on error returns
@@ -35,10 +35,10 @@ operations); these can just trigger a local call to the appropriate
  chaps/chaps_service_redirect.cc | 30 +++++++++++++++
  chaps/chaps_service_redirect.h  | 10 +++++
  chaps/session.h                 |  2 +
- chaps/session_impl.cc           | 19 +++++++++-
+ chaps/session_impl.cc           | 20 +++++++++-
  chaps/session_impl.h            |  1 +
  chaps/session_mock.h            |  1 +
- 16 files changed, 416 insertions(+), 16 deletions(-)
+ 16 files changed, 417 insertions(+), 16 deletions(-)
 
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
 index 60abdf9..bd9d7df 100644
@@ -1041,7 +1041,7 @@ index dab76fb..c08caab 100644
    virtual CK_RV VerifyFinal(const std::string& signature) = 0;
    // Performs an entire operation in a single step (like C_Encrypt). This is
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
-index af625c0..cc3530d 100644
+index af625c0..4c61eea 100644
 --- a/chaps/session_impl.cc
 +++ b/chaps/session_impl.cc
 @@ -282,6 +282,7 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
@@ -1081,7 +1081,15 @@ index af625c0..cc3530d 100644
      return CKR_OPERATION_ACTIVE;
    }
    context->is_incremental_ = true;
-@@ -950,7 +966,8 @@ CK_RV SessionImpl::GetOperationOutput(OperationContext* context,
+@@ -420,6 +436,7 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
+   }
+   if (context->is_incremental_) {
+     LOG(ERROR) << "Operation is incremental.";
++    OperationCancel(operation);
+     return CKR_OPERATION_ACTIVE;
+   }
+   context->is_single_ = true;
+@@ -950,7 +967,8 @@ CK_RV SessionImpl::GetOperationOutput(OperationContext* context,
    *required_out_length = out_length;
    if (max_length < out_length)
      return CKR_BUFFER_TOO_SMALL;
