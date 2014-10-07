@@ -12,15 +12,15 @@ PKCS#11 spec has variants of the following (from C_Encrypt):
 So track whether a one-shot or multi-part operation has been started, and
 reject the other style if so.
 ---
- chaps/session_impl.cc | 42 ++++++++++++++++++++++++++++++++++++++++--
+ chaps/session_impl.cc | 45 +++++++++++++++++++++++++++++++++++++++++++--
  chaps/session_impl.h  |  9 +++++++++
- 2 files changed, 49 insertions(+), 2 deletions(-)
+ 2 files changed, 52 insertions(+), 2 deletions(-)
 
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
-index 76ee65f..af625c0 100644
+index 76ee65f..223d6c2 100644
 --- a/chaps/session_impl.cc
 +++ b/chaps/session_impl.cc
-@@ -280,6 +280,20 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
+@@ -280,6 +280,23 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
      LOG(ERROR) << "Operation is not initialized.";
      return CKR_OPERATION_NOT_INITIALIZED;
    }
@@ -29,7 +29,10 @@ index 76ee65f..af625c0 100644
 +    return CKR_OPERATION_ACTIVE;
 +  }
 +  context->is_incremental_ = true;
-+  return OperationUpdateInternal(operation, data_in, required_out_length, data_out);
++  return OperationUpdateInternal(operation,
++                                 data_in,
++                                 required_out_length,
++                                 data_out);
 +}
 +
 +CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
@@ -41,7 +44,7 @@ index 76ee65f..af625c0 100644
    if (context->is_cipher_) {
      return CipherUpdate(context, data_in, required_out_length, data_out);
    } else if (context->is_digest_) {
-@@ -310,6 +324,19 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
+@@ -310,6 +327,19 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
      LOG(ERROR) << "Operation is not initialized.";
      return CKR_OPERATION_NOT_INITIALIZED;
    }
@@ -61,7 +64,7 @@ index 76ee65f..af625c0 100644
    context->is_valid_ = false;
    // Complete the operation if it has not already been done.
    if (!context->is_finished_) {
-@@ -387,15 +414,24 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
+@@ -387,15 +417,24 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
                                         string* data_out) {
    CHECK(operation < kNumOperationTypes);
    OperationContext* context = &operation_context_[operation];
@@ -88,7 +91,7 @@ index 76ee65f..af625c0 100644
      if (result != CKR_OK)
        return result;
      context->data_ = update + final;
-@@ -1332,6 +1368,8 @@ void SessionImpl::OperationContext::Clear() {
+@@ -1332,6 +1371,8 @@ void SessionImpl::OperationContext::Clear() {
    is_cipher_ = false;
    is_digest_ = false;
    is_hmac_ = false;
@@ -98,15 +101,15 @@ index 76ee65f..af625c0 100644
    key_ = NULL;
    data_.clear();
 diff --git a/chaps/session_impl.h b/chaps/session_impl.h
-index 37307ce..7dcb735 100644
+index 37307ce..def9ee3 100644
 --- a/chaps/session_impl.h
 +++ b/chaps/session_impl.h
 @@ -111,6 +111,8 @@ class SessionImpl : public Session {
      bool is_cipher_;  // Set to true when cipher_context_ is valid.
      bool is_digest_;  // Set to true when digest_context_ is valid.
      bool is_hmac_;  // Set to true when hmac_context_ is valid.
-+    bool is_incremental_;  // Set to true when an incremental operation is performed.
-+    bool is_single_;  // Set to true when a single operation is performed.
++    bool is_incremental_;  // Set when an incremental operation is performed.
++    bool is_single_;  // Set when a single operation is performed.
      bool is_finished_;  // Set to true when the operation completes.
      union {
        EVP_CIPHER_CTX cipher_context_;

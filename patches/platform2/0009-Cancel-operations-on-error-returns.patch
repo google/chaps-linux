@@ -1041,7 +1041,7 @@ index dab76fb..c08caab 100644
    virtual CK_RV VerifyFinal(const std::string& signature) = 0;
    // Performs an entire operation in a single step (like C_Encrypt). This is
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
-index af625c0..4c61eea 100644
+index 223d6c2..96c574a 100644
 --- a/chaps/session_impl.cc
 +++ b/chaps/session_impl.cc
 @@ -282,6 +282,7 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
@@ -1052,7 +1052,7 @@ index af625c0..4c61eea 100644
      return CKR_OPERATION_ACTIVE;
    }
    context->is_incremental_ = true;
-@@ -313,6 +314,20 @@ CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
+@@ -316,6 +317,20 @@ CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
    return CKR_OK;
  }
  
@@ -1073,7 +1073,7 @@ index af625c0..4c61eea 100644
  CK_RV SessionImpl::OperationFinal(OperationType operation,
                                    int* required_out_length,
                                    string* data_out) {
-@@ -326,6 +341,7 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
+@@ -329,6 +344,7 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
    }
    if (context->is_single_) {
      LOG(ERROR) << "Operation is not incremental.";
@@ -1081,7 +1081,7 @@ index af625c0..4c61eea 100644
      return CKR_OPERATION_ACTIVE;
    }
    context->is_incremental_ = true;
-@@ -420,6 +436,7 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
+@@ -423,6 +439,7 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
    }
    if (context->is_incremental_) {
      LOG(ERROR) << "Operation is incremental.";
@@ -1089,7 +1089,7 @@ index af625c0..4c61eea 100644
      return CKR_OPERATION_ACTIVE;
    }
    context->is_single_ = true;
-@@ -950,7 +967,8 @@ CK_RV SessionImpl::GetOperationOutput(OperationContext* context,
+@@ -953,7 +970,8 @@ CK_RV SessionImpl::GetOperationOutput(OperationContext* context,
    *required_out_length = out_length;
    if (max_length < out_length)
      return CKR_BUFFER_TOO_SMALL;
@@ -1100,7 +1100,7 @@ index af625c0..4c61eea 100644
    return CKR_OK;
  }
 diff --git a/chaps/session_impl.h b/chaps/session_impl.h
-index 7dcb735..f3c0057 100644
+index def9ee3..e551354 100644
 --- a/chaps/session_impl.h
 +++ b/chaps/session_impl.h
 @@ -80,6 +80,7 @@ class SessionImpl : public Session {
