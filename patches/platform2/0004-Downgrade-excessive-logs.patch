@@ -3,6 +3,10 @@ From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:02:08 +0100
 Subject: [PATCH 4/9] chaps: Downgrade excessive logs
 
+Logs appear on stdout/stderr on Linux.
+
+BUG=None
+TESTED=Chaps unit tests plus PKCS11 tests
 ---
  chaps/chaps_proxy.cc   | 2 +-
  chaps/isolate_linux.cc | 2 +-

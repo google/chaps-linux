@@ -7,6 +7,9 @@ Subject: [PATCH 1/9] chaps: Update Makefile for Linux build
  - Turn on exception support, needed for D-Bus C++ library.
  - Set SONAME in libchaps.0.so if CHAPS_VERSION_MAJOR specified.
  - Ensure PAM module links with libpam.
+
+BUG=None
+TESTED=Chaps unit tests plus PKCS11 tests
 ---
  chaps/Makefile | 20 +++++++++++++++++++-
  1 file changed, 19 insertions(+), 1 deletion(-)

@@ -4,7 +4,10 @@ Date: Thu, 2 Oct 2014 11:57:19 +0100
 Subject: [PATCH 2/9] chaps: Use D-Bus request_name() method on Linux
 
 DBus::Connection::acquire_name does not exist in the upstream version
- of libdbus-c++, so stick to the original request_name use on Linux.
+of libdbus-c++, so stick to the original request_name use on Linux.
+
+BUG=None
+TESTED=Chaps unit tests plus PKCS11 tests
 ---
  chaps/Makefile         | 4 ++++
  chaps/chaps_adaptor.cc | 4 ++++

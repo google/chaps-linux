@@ -3,6 +3,10 @@ From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:05:57 +0100
 Subject: [PATCH 7/9] chaps: Disable :memory: tests if libmemenv not present
 
+For Linux systems without libmemenv.
+
+BUG=None
+TESTED=Chaps unit tests plus PKCS11 tests
 ---
  chaps/object_store_test.cc | 2 ++
  1 file changed, 2 insertions(+)

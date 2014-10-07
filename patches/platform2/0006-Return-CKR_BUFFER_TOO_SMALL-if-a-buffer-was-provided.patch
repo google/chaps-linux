@@ -8,6 +8,9 @@ As per PKCS#11 s11.2:
  - if the output buffer is NULL, the return code should be CKR_OK
  - if the output buffer is present but too small, the return code should be
    CKR_BUFFER_TOO_SMALL
+
+BUG=None
+TESTED=Chaps unit tests plus PKCS11 tests
 ---
  chaps/chaps.cc | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

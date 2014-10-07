@@ -4,6 +4,9 @@ Date: Thu, 2 Oct 2014 12:00:19 +0100
 Subject: [PATCH 3/9] chaps: Reinstate org.chromium.Chaps.service file
 
 This reverts commit 6e8077189cbb ("Remove org.chromium.Chaps.service")
+
+BUG=None
+TESTED=Chaps unit tests plus PKCS11 tests
 ---
  chaps/org.chromium.Chaps.service | 4 ++++
  1 file changed, 4 insertions(+)

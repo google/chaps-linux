@@ -11,6 +11,9 @@ PKCS#11 spec has variants of the following (from C_Encrypt):
 
 So track whether a one-shot or multi-part operation has been started, and
 reject the other style if so.
+
+BUG=None
+TESTED=Chaps unit tests plus PKCS11 tests
 ---
  chaps/session_impl.cc | 45 +++++++++++++++++++++++++++++++++++++++++++--
  chaps/session_impl.h  |  9 +++++++++
