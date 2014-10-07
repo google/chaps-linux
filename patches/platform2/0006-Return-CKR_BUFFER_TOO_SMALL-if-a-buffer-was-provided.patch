@@ -1,7 +1,7 @@
 From f45577069533cb1174baf4ed62789659b2a31b4e Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:05:04 +0100
-Subject: [PATCH 6/9] Return CKR_BUFFER_TOO_SMALL if a buffer was provided by
+Subject: [PATCH 6/9] chaps: Return CKR_BUFFER_TOO_SMALL if a buffer was provided by
  the user
 
 As per PKCS#11 s11.2:

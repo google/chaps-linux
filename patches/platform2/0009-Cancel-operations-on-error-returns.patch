@@ -1,7 +1,7 @@
 From 98f93c3671d9517397912d44147a7f6f6238018a Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 3 Oct 2014 11:35:34 +0100
-Subject: [PATCH 9/9] Cancel operations on error returns
+Subject: [PATCH 9/9] chaps: Cancel operations on error returns
 
 The PKCS#11 spec indicates that if errors are returned from
 crypto operation functions, the in-progress operation should

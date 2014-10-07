@@ -1,7 +1,7 @@
 From 29fe2e733af387ec9a37fd5029c903b86f496ef7 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:00:19 +0100
-Subject: [PATCH 3/9] Reinstate org.chromium.Chaps.service file
+Subject: [PATCH 3/9] chaps: Reinstate org.chromium.Chaps.service file
 
 This reverts commit 6e8077189cbb ("Remove org.chromium.Chaps.service")
 ---

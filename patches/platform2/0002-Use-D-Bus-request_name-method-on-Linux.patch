@@ -1,7 +1,7 @@
 From 66a5acccc2b953aea6b8ae679c85c6b5c431d011 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 11:57:19 +0100
-Subject: [PATCH 2/9] Use D-Bus request_name() method on Linux
+Subject: [PATCH 2/9] chaps: Use D-Bus request_name() method on Linux
 
 DBus::Connection::acquire_name does not exist in the upstream version
  of libdbus-c++, so stick to the original request_name use on Linux.
