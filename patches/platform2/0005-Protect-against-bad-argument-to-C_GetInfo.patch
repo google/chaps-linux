@@ -4,7 +4,7 @@ Date: Thu, 2 Oct 2014 12:03:15 +0100
 Subject: [PATCH 5/9] chaps: Protect against bad argument to C_GetInfo
 
 BUG=None
-TESTED=Chaps unit tests plus PKCS11 tests
+TEST=Chaps unit tests plus PKCS11 tests
 ---
  chaps/chaps.cc | 1 +
  1 file changed, 1 insertion(+)

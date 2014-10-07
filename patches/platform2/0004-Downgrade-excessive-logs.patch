@@ -6,7 +6,7 @@ Subject: [PATCH 4/9] chaps: Downgrade excessive logs
 Logs appear on stdout/stderr on Linux.
 
 BUG=None
-TESTED=Chaps unit tests plus PKCS11 tests
+TEST=Chaps unit tests plus PKCS11 tests
 ---
  chaps/chaps_proxy.cc   | 2 +-
  chaps/isolate_linux.cc | 2 +-

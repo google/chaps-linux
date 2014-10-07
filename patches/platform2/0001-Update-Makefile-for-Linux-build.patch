@@ -9,7 +9,7 @@ Subject: [PATCH 1/9] chaps: Update Makefile for Linux build
  - Ensure PAM module links with libpam.
 
 BUG=None
-TESTED=Chaps unit tests plus PKCS11 tests
+TEST=Chaps unit tests plus PKCS11 tests
 ---
  chaps/Makefile | 20 +++++++++++++++++++-
  1 file changed, 19 insertions(+), 1 deletion(-)

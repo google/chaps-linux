@@ -7,7 +7,7 @@ DBus::Connection::acquire_name does not exist in the upstream version
 of libdbus-c++, so stick to the original request_name use on Linux.
 
 BUG=None
-TESTED=Chaps unit tests plus PKCS11 tests
+TEST=Chaps unit tests plus PKCS11 tests
 ---
  chaps/Makefile         | 4 ++++
  chaps/chaps_adaptor.cc | 4 ++++
