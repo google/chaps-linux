@@ -1,4 +1,4 @@
-From 98f93c3671d9517397912d44147a7f6f6238018a Mon Sep 17 00:00:00 2001
+From 1dbfefb1e2c96b2f5cca255fdc5935c65f900153 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 3 Oct 2014 11:35:34 +0100
 Subject: [PATCH 9/9] chaps: Cancel operations on error returns
@@ -21,15 +21,12 @@ There are also some errors detected at the daemon side (in
 particular, the interspersal of one-shot and incremental
 operations); these can just trigger a local call to the appropriate
 <Operation>Cancel function.
-
-BUG=None
-TEST=Chaps unit tests plus PKCS11 tests
 ---
  chaps/chaps.cc                  | 70 +++++++++++++++++++++++++++--------
  chaps/chaps_adaptor.cc          | 81 +++++++++++++++++++++++++++++++++++++++++
  chaps/chaps_adaptor.h           | 25 +++++++++++++
- chaps/chaps_interface.h         | 18 +++++++++
- chaps/chaps_interface.xml       | 29 +++++++++++++++
+ chaps/chaps_interface.h         | 20 ++++++++++
+ chaps/chaps_interface.xml       | 30 +++++++++++++++
  chaps/chaps_proxy.cc            | 60 ++++++++++++++++++++++++++++++
  chaps/chaps_proxy.h             | 10 +++++
  chaps/chaps_proxy_mock.h        | 10 +++++
@@ -38,10 +35,10 @@ TEST=Chaps unit tests plus PKCS11 tests
  chaps/chaps_service_redirect.cc | 30 +++++++++++++++
  chaps/chaps_service_redirect.h  | 10 +++++
  chaps/session.h                 |  2 +
- chaps/session_impl.cc           | 20 +++++++++-
+ chaps/session_impl.cc           | 19 +++++++++-
  chaps/session_impl.h            |  1 +
  chaps/session_mock.h            |  1 +
- 16 files changed, 417 insertions(+), 16 deletions(-)
+ 16 files changed, 419 insertions(+), 16 deletions(-)
 
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
 index 60abdf9..bd9d7df 100644
@@ -447,7 +444,7 @@ index 74b1cb6..2d95b59 100644
        const std::vector<uint8_t>& isolate_credential,
        const uint64_t& session_id,
 diff --git a/chaps/chaps_interface.h b/chaps/chaps_interface.h
-index 8a8c527..cb05f3e 100644
+index 8a8c527..4b8af8c 100644
 --- a/chaps/chaps_interface.h
 +++ b/chaps/chaps_interface.h
 @@ -208,6 +208,10 @@ class ChapsInterface {
@@ -494,17 +491,19 @@ index 8a8c527..cb05f3e 100644
    // PKCS #11 v2.20 section 11.11 page 155.
    virtual uint32_t SignRecoverInit(
       const chromeos::SecureBlob& isolate_credential,
-@@ -317,6 +333,8 @@ class ChapsInterface {
+@@ -317,6 +333,10 @@ class ChapsInterface {
    virtual uint32_t VerifyFinal(const chromeos::SecureBlob& isolate_credential,
                                 uint64_t session_id,
                                 const std::vector<uint8_t>& signature) = 0;
++  // PKCS #11 v2.20 section 11.12 page 159: any errors terminate the active
++  // verification operation.
 +  virtual void VerifyCancel(const chromeos::SecureBlob& isolate_credential,
 +                            uint64_t session_id) = 0;
    // PKCS #11 v2.20 section 11.12 page 161.
    virtual uint32_t VerifyRecoverInit(
        const chromeos::SecureBlob& isolate_credential,
 diff --git a/chaps/chaps_interface.xml b/chaps/chaps_interface.xml
-index 80fc2e6..a442f29 100644
+index 80fc2e6..5436a62 100644
 --- a/chaps/chaps_interface.xml
 +++ b/chaps/chaps_interface.xml
 @@ -440,6 +440,12 @@
@@ -559,10 +558,11 @@ index 80fc2e6..a442f29 100644
      <!-- PKCS #11 v2.20 section 11.11 page 155. -->
      <method name="SignRecoverInit">
        <arg type="ay" name="isolate_credential" direction="in"/>
-@@ -661,6 +685,11 @@
+@@ -661,6 +685,12 @@
        </arg>
      </method>
  
++    <!-- PKCS #11 v2.20 section 11.12 page 159. -->
 +    <method name="VerifyCancel">
 +      <arg type="ay" name="isolate_credential" direction="in"/>
 +      <arg type="t" name="session_id" direction="in"/>
@@ -769,7 +769,7 @@ index 342e4bb..7d5ad32 100644
                                             uint64_t,
                                             uint64_t,
 diff --git a/chaps/chaps_service.cc b/chaps/chaps_service.cc
-index 5ba8165..e532f7e 100644
+index 5ba8165..027832f 100644
 --- a/chaps/chaps_service.cc
 +++ b/chaps/chaps_service.cc
 @@ -648,6 +648,17 @@ uint32_t ChapsServiceImpl::EncryptFinal(const SecureBlob& isolate_credential,
@@ -784,7 +784,7 @@ index 5ba8165..e532f7e 100644
 +                                 &session))
 +    return;
 +  CHECK(session);
-+  return session->OperationCancel(kEncrypt);
++  session->OperationCancel(kEncrypt);
 +}
 +
  uint32_t ChapsServiceImpl::DecryptInit(
@@ -802,7 +802,7 @@ index 5ba8165..e532f7e 100644
 +                                 &session))
 +    return;
 +  CHECK(session);
-+  return session->OperationCancel(kDecrypt);
++  session->OperationCancel(kDecrypt);
 +}
 +
 +
@@ -839,7 +839,7 @@ index 5ba8165..e532f7e 100644
 +                                 &session))
 +    return;
 +  CHECK(session);
-+  return session->OperationCancel(kSign);
++  session->OperationCancel(kSign);
 +}
 +
  uint32_t ChapsServiceImpl::SignRecoverInit(
@@ -857,7 +857,7 @@ index 5ba8165..e532f7e 100644
 +                                 &session))
 +    return;
 +  CHECK(session);
-+  return session->OperationCancel(kVerify);
++  session->OperationCancel(kVerify);
 +}
 +
  uint32_t ChapsServiceImpl::VerifyRecoverInit(
@@ -1044,18 +1044,30 @@ index dab76fb..c08caab 100644
    virtual CK_RV VerifyFinal(const std::string& signature) = 0;
    // Performs an entire operation in a single step (like C_Encrypt). This is
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
-index 223d6c2..96c574a 100644
+index 09872ac..3b39b06 100644
 --- a/chaps/session_impl.cc
 +++ b/chaps/session_impl.cc
 @@ -282,6 +282,7 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
    }
-   if (context->is_single_) {
-     LOG(ERROR) << "Operation is not incremental.";
+   if (context->is_finished_) {
+     LOG(ERROR) << "Operation is finished.";
 +    OperationCancel(operation);
      return CKR_OPERATION_ACTIVE;
    }
    context->is_incremental_ = true;
-@@ -316,6 +317,20 @@ CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
+@@ -298,7 +299,10 @@ CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
+   CHECK(operation < kNumOperationTypes);
+   OperationContext* context = &operation_context_[operation];
+   if (context->is_cipher_) {
+-    return CipherUpdate(context, data_in, required_out_length, data_out);
++    CK_RV rv = CipherUpdate(context, data_in, required_out_length, data_out);
++    if ((rv != CKR_OK) && (rv != CKR_BUFFER_TOO_SMALL))
++      OperationCancel(operation);
++    return rv;
+   } else if (context->is_digest_) {
+     EVP_DigestUpdate(&context->digest_context_,
+                      data_in.data(),
+@@ -316,6 +320,17 @@ CK_RV SessionImpl::OperationUpdateInternal(OperationType operation,
    return CKR_OK;
  }
  
@@ -1066,11 +1078,8 @@ index 223d6c2..96c574a 100644
 +    LOG(ERROR) << "Operation is not initialized.";
 +    return;
 +  }
-+  int out_length = 0;
-+  OperationFinalInternal(operation, &out_length, NULL);
-+
-+  // Drop the context even though the data is still pending.
-+  context->is_valid_ = false;
++  // Drop the context and any associated data.
++  context->Clear();
 +}
 +
  CK_RV SessionImpl::OperationFinal(OperationType operation,
@@ -1078,7 +1087,7 @@ index 223d6c2..96c574a 100644
                                    string* data_out) {
 @@ -329,6 +344,7 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
    }
-   if (context->is_single_) {
+   if (!context->is_incremental_) {
      LOG(ERROR) << "Operation is not incremental.";
 +    OperationCancel(operation);
      return CKR_OPERATION_ACTIVE;
@@ -1091,19 +1100,9 @@ index 223d6c2..96c574a 100644
 +    OperationCancel(operation);
      return CKR_OPERATION_ACTIVE;
    }
-   context->is_single_ = true;
-@@ -953,7 +970,8 @@ CK_RV SessionImpl::GetOperationOutput(OperationContext* context,
-   *required_out_length = out_length;
-   if (max_length < out_length)
-     return CKR_BUFFER_TOO_SMALL;
--  *data_out = context->data_;
-+  if (data_out)
-+    *data_out = context->data_;
-   context->data_.clear();
-   return CKR_OK;
- }
+   CK_RV result = CKR_OK;
 diff --git a/chaps/session_impl.h b/chaps/session_impl.h
-index def9ee3..e551354 100644
+index a725831..5cb3977 100644
 --- a/chaps/session_impl.h
 +++ b/chaps/session_impl.h
 @@ -80,6 +80,7 @@ class SessionImpl : public Session {

@@ -1,31 +1,28 @@
-From 66a5acccc2b953aea6b8ae679c85c6b5c431d011 Mon Sep 17 00:00:00 2001
+From cbae6c5be1fc57b79711e7c3e8b88609bfbd7823 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 11:57:19 +0100
-Subject: [PATCH 2/9] chaps: Use D-Bus request_name() method on Linux
+Subject: [PATCH 2/9] chaps: Check for D-Bus acquire_name() method
 
-DBus::Connection::acquire_name does not exist in the upstream version
-of libdbus-c++, so stick to the original request_name use on Linux.
-
-BUG=None
-TEST=Chaps unit tests plus PKCS11 tests
+DBus::Connection::acquire_name() does not exist in the upstream version
+of libdbus-c++, so check for it and stick to the original request_name()
+method if not present.
 ---
- chaps/Makefile         | 4 ++++
+ chaps/Makefile         | 6 ++++++
  chaps/chaps_adaptor.cc | 4 ++++
- 2 files changed, 8 insertions(+)
+ 2 files changed, 10 insertions(+)
 
 diff --git a/chaps/Makefile b/chaps/Makefile
-index 9ce946e..2083816 100644
+index e9d024e..7f6ebbb 100644
 --- a/chaps/Makefile
 +++ b/chaps/Makefile
-@@ -127,9 +127,13 @@ all: CXX_BINARY(chapsd)
- # Chaps DBus Configuration
- ifeq ($(LINUX_BUILD),1)
- DBUS_POLICY = "context=\"default\""
-+DBUS_FLAGS = -DNO_DBUS_ACQUIRE_NAME
+@@ -130,6 +130,12 @@ DBUS_POLICY = "context=\"default\""
  else
  DBUS_POLICY = "group=\"pkcs11\""
-+DBUS_FLAGS =
  endif
++DBUS_FLAGS := $(call check_compile_cxx, \
++	'\#include <dbus-c++/dbus.h>\nint main(){\
++	DBus::Connection::SystemBus().acquire_name("dummy");\
++	return 0;}',,-DNO_DBUS_ACQUIRE_NAME)
 +CXXFLAGS += $(DBUS_FLAGS)
 +
  .PHONY: $(OUT)/org.chromium.Chaps.conf

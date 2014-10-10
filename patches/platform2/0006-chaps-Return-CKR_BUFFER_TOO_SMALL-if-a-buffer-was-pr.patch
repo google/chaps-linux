@@ -1,16 +1,13 @@
-From f45577069533cb1174baf4ed62789659b2a31b4e Mon Sep 17 00:00:00 2001
+From d61ea68f5c660eed47a525562a094e490cf0cb05 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:05:04 +0100
-Subject: [PATCH 6/9] chaps: Return CKR_BUFFER_TOO_SMALL if a buffer was provided by
- the user
+Subject: [PATCH 6/9] chaps: Return CKR_BUFFER_TOO_SMALL if a buffer was
+ provided by the user
 
 As per PKCS#11 s11.2:
  - if the output buffer is NULL, the return code should be CKR_OK
  - if the output buffer is present but too small, the return code should be
    CKR_BUFFER_TOO_SMALL
-
-BUG=None
-TEST=Chaps unit tests plus PKCS11 tests
 ---
  chaps/chaps.cc | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
