@@ -1,4 +1,4 @@
-From 1dbfefb1e2c96b2f5cca255fdc5935c65f900153 Mon Sep 17 00:00:00 2001
+From ea13d3328fcce01b2b073a48add183162ff3bbf7 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 3 Oct 2014 11:35:34 +0100
 Subject: [PATCH 9/9] chaps: Cancel operations on error returns
@@ -34,11 +34,13 @@ operations); these can just trigger a local call to the appropriate
  chaps/chaps_service.h           | 10 +++++
  chaps/chaps_service_redirect.cc | 30 +++++++++++++++
  chaps/chaps_service_redirect.h  | 10 +++++
+ chaps/chaps_test.cc             | 14 +++++++
  chaps/session.h                 |  2 +
  chaps/session_impl.cc           | 19 +++++++++-
  chaps/session_impl.h            |  1 +
  chaps/session_mock.h            |  1 +
- 16 files changed, 419 insertions(+), 16 deletions(-)
+ chaps/session_test.cc           | 13 +++++++
+ 18 files changed, 446 insertions(+), 16 deletions(-)
 
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
 index 60abdf9..bd9d7df 100644
@@ -1030,6 +1032,45 @@ index bbf0ec6..daedd17 100644
    virtual uint32_t VerifyRecoverInit(
        const chromeos::SecureBlob& isolate_credential,
        uint64_t session_id,
+diff --git a/chaps/chaps_test.cc b/chaps/chaps_test.cc
+index 1d1761b..a0f5932 100644
+--- a/chaps/chaps_test.cc
++++ b/chaps/chaps_test.cc
+@@ -1570,6 +1570,11 @@ TEST_F(TestEncrypt, EncryptBadArgs) {
+   CK_ULONG_PTR ul = (CK_ULONG_PTR)0x1234;
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_EncryptInit(1, NULL, 3));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_DecryptInit(1, NULL, 3));
++
++  // All of the following failures should trigger an attempt to cancel the
++  // operation in progress.
++  EXPECT_CALL(proxy, EncryptCancel(_, 1)).Times(5);
++  EXPECT_CALL(proxy, DecryptCancel(_, 1)).Times(5);
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Encrypt(1, p, 3, p, NULL));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Decrypt(1, p, 3, p, NULL));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Encrypt(1, NULL, 3, p, ul));
+@@ -1745,6 +1750,10 @@ TEST_F(TestDigest, DigestBadArgs) {
+   CK_BYTE_PTR p = (CK_BYTE_PTR)0x1234;
+   CK_ULONG_PTR ul = (CK_ULONG_PTR)0x1234;
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_DigestInit(1, NULL));
++
++  // All of the following failures should trigger an attempt to cancel the
++  // operation in progress.
++  EXPECT_CALL(proxy, DigestCancel(_, 1)).Times(5);
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Digest(1, p, 3, p, NULL));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Digest(1, NULL, 3, p, ul));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_DigestUpdate(1, NULL, 3));
+@@ -1944,6 +1953,11 @@ TEST_F(TestSign, SignBadArgs) {
+   CK_ULONG_PTR ul = (CK_ULONG_PTR)0x1234;
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_SignInit(1, NULL, 3));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_VerifyInit(1, NULL, 3));
++
++  // All of the following failures should trigger an attempt to cancel the
++  // operation in progress.
++  EXPECT_CALL(proxy, SignCancel(_, 1)).Times(5);
++  EXPECT_CALL(proxy, VerifyCancel(_, 1)).Times(7);
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Sign(1, p, 3, p, NULL));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Sign(1, NULL, 3, p, ul));
+   EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Verify(1, NULL, 3, p, 3));
 diff --git a/chaps/session.h b/chaps/session.h
 index dab76fb..c08caab 100644
 --- a/chaps/session.h
@@ -1125,6 +1166,44 @@ index 0bf6d07..d646a48 100644
    MOCK_METHOD1(VerifyFinal, CK_RV(const std::string&));
    MOCK_METHOD4(OperationSinglePart, CK_RV(OperationType,
                                            const std::string&,
+diff --git a/chaps/session_test.cc b/chaps/session_test.cc
+index d8246ac..2ff12e9 100644
+--- a/chaps/session_test.cc
++++ b/chaps/session_test.cc
+@@ -455,6 +455,11 @@ TEST_F(TestSession, UpdateOperationPreventsSinglePart) {
+                                           in.substr(10, 20),
+                                           &len,
+                                           &out));
++
++  // The error also terminates the operation.
++  len = 0;
++  EXPECT_EQ(CKR_OPERATION_NOT_INITIALIZED,
++            session_->OperationFinal(kDigest, &len, &out));
+ }
+ 
+ TEST_F(TestSession, SinglePartOperationPreventsUpdate) {
+@@ -471,6 +476,10 @@ TEST_F(TestSession, SinglePartOperationPreventsUpdate) {
+                                       in.substr(10, 10),
+                                       NULL,
+                                       NULL));
++
++  // The error also terminates the operation.
++  EXPECT_EQ(CKR_OPERATION_NOT_INITIALIZED,
++            session_->OperationSinglePart(kDigest, in, &len, &out));
+ }
+ 
+ TEST_F(TestSession, SinglePartOperationPreventsFinal) {
+@@ -485,6 +494,10 @@ TEST_F(TestSession, SinglePartOperationPreventsFinal) {
+   len = 0;
+   EXPECT_EQ(CKR_OPERATION_ACTIVE,
+             session_->OperationFinal(kDigest, &len, &out));
++
++  // The error also terminates the operation.
++  EXPECT_EQ(CKR_OPERATION_NOT_INITIALIZED,
++            session_->OperationSinglePart(kDigest, in, &len, &out));
+ }
+ 
+ // Test RSA PKCS #1 encryption.
 -- 
 1.9.1
 

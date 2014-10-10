@@ -1,4 +1,4 @@
-From 3b40ac465ee3337c426a47d940a37084ec618c7a Mon Sep 17 00:00:00 2001
+From 0bf549e61a5ce47ff0e15604249981e931d8c308 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:08:33 +0100
 Subject: [PATCH 8/9] chaps: Prevent interspersal of incremental and one-shot
@@ -14,7 +14,8 @@ reject the other style if so.
 ---
  chaps/session_impl.cc | 43 +++++++++++++++++++++++++++++++++++++++++--
  chaps/session_impl.h  |  8 ++++++++
- 2 files changed, 49 insertions(+), 2 deletions(-)
+ chaps/session_test.cc | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 96 insertions(+), 2 deletions(-)
 
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
 index 76ee65f..09872ac 100644
@@ -124,6 +125,64 @@ index 37307ce..a725831 100644
    CK_RV CipherInit(bool is_encrypt,
                     CK_MECHANISM_TYPE mechanism,
                     const std::string& mechanism_parameter,
+diff --git a/chaps/session_test.cc b/chaps/session_test.cc
+index 23015b6..d8246ac 100644
+--- a/chaps/session_test.cc
++++ b/chaps/session_test.cc
+@@ -440,6 +440,53 @@ TEST_F(TestSession, HMAC) {
+   EXPECT_EQ(CKR_OK, session_->VerifyFinal(out));
+ }
+ 
++// Test multi-part and single-part operations inhibit each other.
++TEST_F(TestSession, UpdateOperationPreventsSinglePart) {
++  string in(30, 'A');
++  EXPECT_EQ(CKR_OK, session_->OperationInit(kDigest, CKM_SHA_1, "", NULL));
++  EXPECT_EQ(CKR_OK, session_->OperationUpdate(kDigest,
++                                              in.substr(0, 10),
++                                              NULL,
++                                              NULL));
++  int len = 0;
++  string out;
++  EXPECT_EQ(CKR_OPERATION_ACTIVE,
++            session_->OperationSinglePart(kDigest,
++                                          in.substr(10, 20),
++                                          &len,
++                                          &out));
++}
++
++TEST_F(TestSession, SinglePartOperationPreventsUpdate) {
++  string in(30, 'A');
++  EXPECT_EQ(CKR_OK, session_->OperationInit(kDigest, CKM_SHA_1, "", NULL));
++  string out;
++  int len = 0;
++  // Perform a single part operation but leave the output to be collected.
++  EXPECT_EQ(CKR_BUFFER_TOO_SMALL,
++            session_->OperationSinglePart(kDigest, in, &len, &out));
++
++  EXPECT_EQ(CKR_OPERATION_ACTIVE,
++            session_->OperationUpdate(kDigest,
++                                      in.substr(10, 10),
++                                      NULL,
++                                      NULL));
++}
++
++TEST_F(TestSession, SinglePartOperationPreventsFinal) {
++  string in(30, 'A');
++  EXPECT_EQ(CKR_OK, session_->OperationInit(kDigest, CKM_SHA_1, "", NULL));
++  string out;
++  int len = 0;
++  // Perform a single part operation but leave the output to be collected.
++  EXPECT_EQ(CKR_BUFFER_TOO_SMALL,
++            session_->OperationSinglePart(kDigest, in, &len, &out));
++
++  len = 0;
++  EXPECT_EQ(CKR_OPERATION_ACTIVE,
++            session_->OperationFinal(kDigest, &len, &out));
++}
++
+ // Test RSA PKCS #1 encryption.
+ TEST_F(TestSession, RSAEncrypt) {
+   const Object* pub = NULL;
 -- 
 1.9.1
 

@@ -1,4 +1,4 @@
-From d61ea68f5c660eed47a525562a094e490cf0cb05 Mon Sep 17 00:00:00 2001
+From 935818a8bac2c5f378da98f793086456bce7a638 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:05:04 +0100
 Subject: [PATCH 6/9] chaps: Return CKR_BUFFER_TOO_SMALL if a buffer was
@@ -9,8 +9,9 @@ As per PKCS#11 s11.2:
  - if the output buffer is present but too small, the return code should be
    CKR_BUFFER_TOO_SMALL
 ---
- chaps/chaps.cc | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ chaps/chaps.cc      |  2 +-
+ chaps/chaps_test.cc | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
 index c94e03c..60abdf9 100644
@@ -25,6 +26,35 @@ index c94e03c..60abdf9 100644
        result = CKR_OK;
    }
    return result;
+diff --git a/chaps/chaps_test.cc b/chaps/chaps_test.cc
+index b307851..1d1761b 100644
+--- a/chaps/chaps_test.cc
++++ b/chaps/chaps_test.cc
+@@ -1467,6 +1467,24 @@ TEST_F(TestEncrypt, EncryptFail) {
+             C_DecryptFinal(1, buffer_out_, &length_out_));
+ }
+ 
++TEST_F(TestEncrypt, EncryptSmallBuffer) {
++  ChapsProxyMock proxy(true);
++  EXPECT_CALL(proxy, Encrypt(_, 1, data_in_, 1, _, _)).
++      WillOnce(DoAll(SetArgumentPointee<4>(length_out_expected_),
++                     Return(CKR_BUFFER_TOO_SMALL)));
++  EXPECT_CALL(proxy, Decrypt(_, 1, data_in_, 1, _, _)).
++      WillOnce(DoAll(SetArgumentPointee<4>(length_out_expected_),
++                     Return(CKR_BUFFER_TOO_SMALL)));
++  length_out_ = 1;
++  EXPECT_EQ(CKR_BUFFER_TOO_SMALL,
++            C_Encrypt(1, buffer_in_, length_in_, buffer_out_, &length_out_));
++  EXPECT_EQ(length_out_, length_out_expected_);
++  length_out_ = 1;
++  EXPECT_EQ(CKR_BUFFER_TOO_SMALL,
++            C_Decrypt(1, buffer_in_, length_in_, buffer_out_, &length_out_));
++  EXPECT_EQ(length_out_, length_out_expected_);
++}
++
+ TEST_F(TestEncrypt, EncryptLengthOnly) {
+   ChapsProxyMock proxy(true);
+   EXPECT_CALL(proxy, Encrypt(_, 1, data_in_, 0, _, _)).
 -- 
 1.9.1
 
