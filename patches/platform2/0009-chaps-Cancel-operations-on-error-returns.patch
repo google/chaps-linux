@@ -1133,7 +1133,7 @@ index 6352f5e40897..272f0b1f39db 100644
                                    string* data_out) {
 @@ -329,6 +344,7 @@ CK_RV SessionImpl::OperationFinal(OperationType operation,
    }
-   if (!context->is_incremental_) {
+   if (context->is_single_) {
      LOG(ERROR) << "Operation is not incremental.";
 +    OperationCancel(operation);
      return CKR_OPERATION_ACTIVE;
@@ -1146,7 +1146,7 @@ index 6352f5e40897..272f0b1f39db 100644
 +    OperationCancel(operation);
      return CKR_OPERATION_ACTIVE;
    }
-   CK_RV result = CKR_OK;
+   context->is_single_ = true;
 diff --git a/chaps/session_impl.h b/chaps/session_impl.h
 index def9ee356f15..e55135471cae 100644
 --- a/chaps/session_impl.h
@@ -1175,7 +1175,7 @@ diff --git a/chaps/session_test.cc b/chaps/session_test.cc
 index 3a7e7842d984..c325601f2740 100644
 --- a/chaps/session_test.cc
 +++ b/chaps/session_test.cc
-@@ -455,6 +455,11 @@ TEST_F(TestSession, UpdateOperationPreventsSinglePart) {
+@@ -465,6 +465,11 @@ TEST_F(TestSession, UpdateOperationPreventsSinglePart) {
                                            in.substr(10, 20),
                                            &len,
                                            &out));

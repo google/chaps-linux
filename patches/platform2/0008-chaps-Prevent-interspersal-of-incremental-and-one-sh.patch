@@ -54,7 +54,7 @@ index 76ee65f985d2..6352f5e40897 100644
      LOG(ERROR) << "Operation is not initialized.";
      return CKR_OPERATION_NOT_INITIALIZED;
    }
-+  if (!context->is_incremental_) {
++  if (context->is_single_) {
 +    LOG(ERROR) << "Operation is not incremental.";
 +    return CKR_OPERATION_ACTIVE;
 +  }
@@ -70,7 +70,7 @@ index 76ee65f985d2..6352f5e40897 100644
    context->is_valid_ = false;
    // Complete the operation if it has not already been done.
    if (!context->is_finished_) {
-@@ -387,15 +417,23 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
+@@ -387,15 +417,24 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
                                         string* data_out) {
    CHECK(operation < kNumOperationTypes);
    OperationContext* context = &operation_context_[operation];
@@ -82,6 +82,7 @@ index 76ee65f985d2..6352f5e40897 100644
 +    LOG(ERROR) << "Operation is incremental.";
 +    return CKR_OPERATION_ACTIVE;
 +  }
++  context->is_single_ = true;
    CK_RV result = CKR_OK;
    if (!context->is_finished_) {
      string update, final;
@@ -96,11 +97,12 @@ index 76ee65f985d2..6352f5e40897 100644
      if (result != CKR_OK)
        return result;
      context->data_ = update + final;
-@@ -1332,6 +1370,7 @@ void SessionImpl::OperationContext::Clear() {
+@@ -1332,6 +1371,8 @@ void SessionImpl::OperationContext::Clear() {
    is_cipher_ = false;
    is_digest_ = false;
    is_hmac_ = false;
 +  is_incremental_ = false;
++  is_single_ = false;
    is_finished_ = false;
    key_ = NULL;
    data_.clear();
@@ -108,15 +110,16 @@ diff --git a/chaps/session_impl.h b/chaps/session_impl.h
 index 37307ce7efed..def9ee356f15 100644
 --- a/chaps/session_impl.h
 +++ b/chaps/session_impl.h
-@@ -111,6 +111,7 @@ class SessionImpl : public Session {
+@@ -111,6 +111,8 @@ class SessionImpl : public Session {
      bool is_cipher_;  // Set to true when cipher_context_ is valid.
      bool is_digest_;  // Set to true when digest_context_ is valid.
      bool is_hmac_;  // Set to true when hmac_context_ is valid.
 +    bool is_incremental_;  // Set when an incremental operation is performed.
++    bool is_single_;  // Set when a single operation is performed.
      bool is_finished_;  // Set to true when the operation completes.
      union {
        EVP_CIPHER_CTX cipher_context_;
-@@ -133,6 +134,13 @@ class SessionImpl : public Session {
+@@ -133,6 +135,13 @@ class SessionImpl : public Session {
                        CK_OBJECT_CLASS object_class,
                        CK_KEY_TYPE key_type);
    bool IsValidMechanism(OperationType operation, CK_MECHANISM_TYPE mechanism);
@@ -134,10 +137,20 @@ diff --git a/chaps/session_test.cc b/chaps/session_test.cc
 index 23015b6df0c8..3a7e7842d984 100644
 --- a/chaps/session_test.cc
 +++ b/chaps/session_test.cc
-@@ -440,6 +440,53 @@ TEST_F(TestSession, HMAC) {
+@@ -440,6 +440,63 @@ TEST_F(TestSession, HMAC) {
    EXPECT_EQ(CKR_OK, session_->VerifyFinal(out));
  }
  
++// Test empty multi-part operation.
++TEST_F(TestSession, FinalWithNoUpdate) {
++  string in(30, 'A');
++  EXPECT_EQ(CKR_OK, session_->OperationInit(kDigest, CKM_SHA_1, "", NULL));
++  int len = 20;
++  string out;
++  EXPECT_EQ(CKR_OK, session_->OperationFinal(kDigest, &len, &out));
++  EXPECT_EQ(20, len);
++}
++
 +// Test multi-part and single-part operations inhibit each other.
 +TEST_F(TestSession, UpdateOperationPreventsSinglePart) {
 +  string in(30, 'A');
