@@ -1,4 +1,4 @@
-From 2b18df3e54ef1c565207dc71ed1f4878119cdb7c Mon Sep 17 00:00:00 2001
+From 44f02ecb42fa9a81f2a06a9f4fb1a8dd666da92b Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:08:33 +0100
 Subject: [PATCH 8/9] chaps: Prevent interspersal of incremental and one-shot
@@ -17,13 +17,13 @@ TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
 
 Change-Id: I484dca635a12246a30c461e6ea7113697e085d26
 ---
- chaps/session_impl.cc | 45 ++++++++++++++++++++++++++++++++++++++--
- chaps/session_impl.h  |  9 ++++++++
+ chaps/session_impl.cc | 43 ++++++++++++++++++++++++++++++++++++--
+ chaps/session_impl.h  |  8 ++++++++
  chaps/session_test.cc | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 109 insertions(+), 2 deletions(-)
+ 3 files changed, 106 insertions(+), 2 deletions(-)
 
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
-index 76ee65f985d2..6352f5e40897 100644
+index 76ee65f985d2..033fe31504df 100644
 --- a/chaps/session_impl.cc
 +++ b/chaps/session_impl.cc
 @@ -280,6 +280,23 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
@@ -54,7 +54,7 @@ index 76ee65f985d2..6352f5e40897 100644
      LOG(ERROR) << "Operation is not initialized.";
      return CKR_OPERATION_NOT_INITIALIZED;
    }
-+  if (context->is_single_) {
++  if (!context->is_incremental_ && context->is_finished_) {
 +    LOG(ERROR) << "Operation is not incremental.";
 +    return CKR_OPERATION_ACTIVE;
 +  }
@@ -70,7 +70,7 @@ index 76ee65f985d2..6352f5e40897 100644
    context->is_valid_ = false;
    // Complete the operation if it has not already been done.
    if (!context->is_finished_) {
-@@ -387,15 +417,24 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
+@@ -387,15 +417,23 @@ CK_RV SessionImpl::OperationSinglePart(OperationType operation,
                                         string* data_out) {
    CHECK(operation < kNumOperationTypes);
    OperationContext* context = &operation_context_[operation];
@@ -82,7 +82,6 @@ index 76ee65f985d2..6352f5e40897 100644
 +    LOG(ERROR) << "Operation is incremental.";
 +    return CKR_OPERATION_ACTIVE;
 +  }
-+  context->is_single_ = true;
    CK_RV result = CKR_OK;
    if (!context->is_finished_) {
      string update, final;
@@ -97,29 +96,27 @@ index 76ee65f985d2..6352f5e40897 100644
      if (result != CKR_OK)
        return result;
      context->data_ = update + final;
-@@ -1332,6 +1371,8 @@ void SessionImpl::OperationContext::Clear() {
+@@ -1332,6 +1370,7 @@ void SessionImpl::OperationContext::Clear() {
    is_cipher_ = false;
    is_digest_ = false;
    is_hmac_ = false;
 +  is_incremental_ = false;
-+  is_single_ = false;
    is_finished_ = false;
    key_ = NULL;
    data_.clear();
 diff --git a/chaps/session_impl.h b/chaps/session_impl.h
-index 37307ce7efed..def9ee356f15 100644
+index 37307ce7efed..a725831fa0f1 100644
 --- a/chaps/session_impl.h
 +++ b/chaps/session_impl.h
-@@ -111,6 +111,8 @@ class SessionImpl : public Session {
+@@ -111,6 +111,7 @@ class SessionImpl : public Session {
      bool is_cipher_;  // Set to true when cipher_context_ is valid.
      bool is_digest_;  // Set to true when digest_context_ is valid.
      bool is_hmac_;  // Set to true when hmac_context_ is valid.
 +    bool is_incremental_;  // Set when an incremental operation is performed.
-+    bool is_single_;  // Set when a single operation is performed.
      bool is_finished_;  // Set to true when the operation completes.
      union {
        EVP_CIPHER_CTX cipher_context_;
-@@ -133,6 +135,13 @@ class SessionImpl : public Session {
+@@ -133,6 +134,13 @@ class SessionImpl : public Session {
                        CK_OBJECT_CLASS object_class,
                        CK_KEY_TYPE key_type);
    bool IsValidMechanism(OperationType operation, CK_MECHANISM_TYPE mechanism);
