@@ -1,14 +1,18 @@
-From a3104319fc5c1149f1c894d367b1132f2d29cee5 Mon Sep 17 00:00:00 2001
+From b2625daed54161fc4dafa7f46f9cfcb03c49c8f9 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:03:15 +0100
 Subject: [PATCH 5/9] chaps: Protect against bad argument to C_GetFunctionList
 
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
+Change-Id: I185250fd209e2233159d3edef75aec815e3d64fe
 ---
  chaps/chaps.cc | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
-index 077323d..c94e03c 100644
+index 077323deb5db..c94e03cef679 100644
 --- a/chaps/chaps.cc
 +++ b/chaps/chaps.cc
 @@ -183,6 +183,7 @@ CK_RV C_GetInfo(CK_INFO_PTR pInfo) {
@@ -20,5 +24,5 @@ index 077323d..c94e03c 100644
    static CK_FUNCTION_LIST functionList = {
      version,
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 

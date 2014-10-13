@@ -1,4 +1,4 @@
-From ea13d3328fcce01b2b073a48add183162ff3bbf7 Mon Sep 17 00:00:00 2001
+From 107aed0a623ce8144076e8111eb6d9a6b32af13d Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Fri, 3 Oct 2014 11:35:34 +0100
 Subject: [PATCH 9/9] chaps: Cancel operations on error returns
@@ -21,6 +21,11 @@ There are also some errors detected at the daemon side (in
 particular, the interspersal of one-shot and incremental
 operations); these can just trigger a local call to the appropriate
 <Operation>Cancel function.
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
+Change-Id: I8108907bfad9b5ba4b81ba25cf253b4e03ca9b9f
 ---
  chaps/chaps.cc                  | 70 +++++++++++++++++++++++++++--------
  chaps/chaps_adaptor.cc          | 81 +++++++++++++++++++++++++++++++++++++++++
@@ -43,7 +48,7 @@ operations); these can just trigger a local call to the appropriate
  18 files changed, 446 insertions(+), 16 deletions(-)
 
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
-index 60abdf9..bd9d7df 100644
+index 60abdf9ea858..bd9d7dfd8852 100644
 --- a/chaps/chaps.cc
 +++ b/chaps/chaps.cc
 @@ -722,8 +722,10 @@ CK_RV C_Encrypt(CK_SESSION_HANDLE hSession,
@@ -227,7 +232,7 @@ index 60abdf9..bd9d7df 100644
        *g_user_isolate,
        hSession,
 diff --git a/chaps/chaps_adaptor.cc b/chaps/chaps_adaptor.cc
-index 7f3eb2b..fbb87dc 100644
+index 7f3eb2baedac..fbb87dc543c3 100644
 --- a/chaps/chaps_adaptor.cc
 +++ b/chaps/chaps_adaptor.cc
 @@ -1093,6 +1093,22 @@ void ChapsAdaptor::EncryptFinal(const vector<uint8_t>& isolate_credential,
@@ -347,7 +352,7 @@ index 7f3eb2b..fbb87dc 100644
        const vector<uint8_t>& isolate_credential,
        const uint64_t& session_id,
 diff --git a/chaps/chaps_adaptor.h b/chaps/chaps_adaptor.h
-index 74b1cb6..2d95b59 100644
+index 74b1cb6560ce..2d95b59207ec 100644
 --- a/chaps/chaps_adaptor.h
 +++ b/chaps/chaps_adaptor.h
 @@ -257,6 +257,9 @@ class ChapsAdaptor : public org::chromium::Chaps_adaptor,
@@ -446,7 +451,7 @@ index 74b1cb6..2d95b59 100644
        const std::vector<uint8_t>& isolate_credential,
        const uint64_t& session_id,
 diff --git a/chaps/chaps_interface.h b/chaps/chaps_interface.h
-index 8a8c527..4b8af8c 100644
+index 8a8c5271b2fb..4b8af8cac63b 100644
 --- a/chaps/chaps_interface.h
 +++ b/chaps/chaps_interface.h
 @@ -208,6 +208,10 @@ class ChapsInterface {
@@ -505,7 +510,7 @@ index 8a8c527..4b8af8c 100644
    virtual uint32_t VerifyRecoverInit(
        const chromeos::SecureBlob& isolate_credential,
 diff --git a/chaps/chaps_interface.xml b/chaps/chaps_interface.xml
-index 80fc2e6..5436a62 100644
+index 80fc2e6a2eac..5436a628729d 100644
 --- a/chaps/chaps_interface.xml
 +++ b/chaps/chaps_interface.xml
 @@ -440,6 +440,12 @@
@@ -574,7 +579,7 @@ index 80fc2e6..5436a62 100644
      <method name="VerifyRecoverInit">
        <arg type="ay" name="isolate_credential" direction="in"/>
 diff --git a/chaps/chaps_proxy.cc b/chaps/chaps_proxy.cc
-index f950234..09d4769 100644
+index f950234603fa..09d47690f221 100644
 --- a/chaps/chaps_proxy.cc
 +++ b/chaps/chaps_proxy.cc
 @@ -788,6 +788,18 @@ uint32_t ChapsProxyImpl::EncryptFinal(const SecureBlob& isolate_credential,
@@ -673,7 +678,7 @@ index f950234..09d4769 100644
        const SecureBlob& isolate_credential,
        uint64_t session_id,
 diff --git a/chaps/chaps_proxy.h b/chaps/chaps_proxy.h
-index 7236b40..83226f3 100644
+index 7236b40134c6..83226f37afa4 100644
 --- a/chaps/chaps_proxy.h
 +++ b/chaps/chaps_proxy.h
 @@ -197,6 +197,8 @@ class ChapsProxyImpl : public ChapsInterface {
@@ -722,7 +727,7 @@ index 7236b40..83226f3 100644
        const chromeos::SecureBlob& isolate_credential,
        uint64_t session_id,
 diff --git a/chaps/chaps_proxy_mock.h b/chaps/chaps_proxy_mock.h
-index 342e4bb..7d5ad32 100644
+index 342e4bbcd87e..7d5ad32fa57c 100644
 --- a/chaps/chaps_proxy_mock.h
 +++ b/chaps/chaps_proxy_mock.h
 @@ -149,6 +149,8 @@ class ChapsProxyMock : public ChapsInterface {
@@ -771,7 +776,7 @@ index 342e4bb..7d5ad32 100644
                                             uint64_t,
                                             uint64_t,
 diff --git a/chaps/chaps_service.cc b/chaps/chaps_service.cc
-index 5ba8165..027832f 100644
+index 5ba8165ad037..027832fe4e0f 100644
 --- a/chaps/chaps_service.cc
 +++ b/chaps/chaps_service.cc
 @@ -648,6 +648,17 @@ uint32_t ChapsServiceImpl::EncryptFinal(const SecureBlob& isolate_credential,
@@ -866,7 +871,7 @@ index 5ba8165..027832f 100644
        const SecureBlob& isolate_credential,
        uint64_t session_id,
 diff --git a/chaps/chaps_service.h b/chaps/chaps_service.h
-index 8b1dcfe..46b462c 100644
+index 8b1dcfe6e19b..46b462c95881 100644
 --- a/chaps/chaps_service.h
 +++ b/chaps/chaps_service.h
 @@ -173,6 +173,8 @@ class ChapsServiceImpl : public ChapsInterface {
@@ -915,7 +920,7 @@ index 8b1dcfe..46b462c 100644
        const chromeos::SecureBlob& isolate_credential,
        uint64_t session_id,
 diff --git a/chaps/chaps_service_redirect.cc b/chaps/chaps_service_redirect.cc
-index e999df9..38e8e10 100644
+index e999df9c0498..38e8e10931ac 100644
 --- a/chaps/chaps_service_redirect.cc
 +++ b/chaps/chaps_service_redirect.cc
 @@ -659,6 +659,12 @@ uint32_t ChapsServiceRedirect::EncryptFinal(
@@ -984,7 +989,7 @@ index e999df9..38e8e10 100644
        const SecureBlob& isolate_credential,
        uint64_t session_id,
 diff --git a/chaps/chaps_service_redirect.h b/chaps/chaps_service_redirect.h
-index bbf0ec6..daedd17 100644
+index bbf0ec617883..daedd175f8f0 100644
 --- a/chaps/chaps_service_redirect.h
 +++ b/chaps/chaps_service_redirect.h
 @@ -175,6 +175,8 @@ class ChapsServiceRedirect : public ChapsInterface {
@@ -1033,7 +1038,7 @@ index bbf0ec6..daedd17 100644
        const chromeos::SecureBlob& isolate_credential,
        uint64_t session_id,
 diff --git a/chaps/chaps_test.cc b/chaps/chaps_test.cc
-index 1d1761b..a0f5932 100644
+index 1d1761be082e..a0f5932fbd03 100644
 --- a/chaps/chaps_test.cc
 +++ b/chaps/chaps_test.cc
 @@ -1570,6 +1570,11 @@ TEST_F(TestEncrypt, EncryptBadArgs) {
@@ -1072,7 +1077,7 @@ index 1d1761b..a0f5932 100644
    EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Sign(1, NULL, 3, p, ul));
    EXPECT_EQ(CKR_ARGUMENTS_BAD, C_Verify(1, NULL, 3, p, 3));
 diff --git a/chaps/session.h b/chaps/session.h
-index dab76fb..c08caab 100644
+index dab76fbb7125..c08caabc01c9 100644
 --- a/chaps/session.h
 +++ b/chaps/session.h
 @@ -93,6 +93,8 @@ class Session {
@@ -1085,7 +1090,7 @@ index dab76fb..c08caab 100644
    virtual CK_RV VerifyFinal(const std::string& signature) = 0;
    // Performs an entire operation in a single step (like C_Encrypt). This is
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
-index 09872ac..3b39b06 100644
+index 6352f5e40897..272f0b1f39db 100644
 --- a/chaps/session_impl.cc
 +++ b/chaps/session_impl.cc
 @@ -282,6 +282,7 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
@@ -1143,7 +1148,7 @@ index 09872ac..3b39b06 100644
    }
    CK_RV result = CKR_OK;
 diff --git a/chaps/session_impl.h b/chaps/session_impl.h
-index a725831..5cb3977 100644
+index def9ee356f15..e55135471cae 100644
 --- a/chaps/session_impl.h
 +++ b/chaps/session_impl.h
 @@ -80,6 +80,7 @@ class SessionImpl : public Session {
@@ -1155,7 +1160,7 @@ index a725831..5cb3977 100644
    virtual CK_RV OperationSinglePart(OperationType operation,
                                      const std::string& data_in,
 diff --git a/chaps/session_mock.h b/chaps/session_mock.h
-index 0bf6d07..d646a48 100644
+index 0bf6d07ff0e4..d646a482116c 100644
 --- a/chaps/session_mock.h
 +++ b/chaps/session_mock.h
 @@ -49,6 +49,7 @@ class SessionMock : public Session {
@@ -1167,7 +1172,7 @@ index 0bf6d07..d646a48 100644
    MOCK_METHOD4(OperationSinglePart, CK_RV(OperationType,
                                            const std::string&,
 diff --git a/chaps/session_test.cc b/chaps/session_test.cc
-index d8246ac..2ff12e9 100644
+index 3a7e7842d984..c325601f2740 100644
 --- a/chaps/session_test.cc
 +++ b/chaps/session_test.cc
 @@ -455,6 +455,11 @@ TEST_F(TestSession, UpdateOperationPreventsSinglePart) {
@@ -1182,7 +1187,7 @@ index d8246ac..2ff12e9 100644
  }
  
  TEST_F(TestSession, SinglePartOperationPreventsUpdate) {
-@@ -471,6 +476,10 @@ TEST_F(TestSession, SinglePartOperationPreventsUpdate) {
+@@ -481,6 +486,10 @@ TEST_F(TestSession, SinglePartOperationPreventsUpdate) {
                                        in.substr(10, 10),
                                        NULL,
                                        NULL));
@@ -1193,7 +1198,7 @@ index d8246ac..2ff12e9 100644
  }
  
  TEST_F(TestSession, SinglePartOperationPreventsFinal) {
-@@ -485,6 +494,10 @@ TEST_F(TestSession, SinglePartOperationPreventsFinal) {
+@@ -495,6 +504,10 @@ TEST_F(TestSession, SinglePartOperationPreventsFinal) {
    len = 0;
    EXPECT_EQ(CKR_OPERATION_ACTIVE,
              session_->OperationFinal(kDigest, &len, &out));
@@ -1205,5 +1210,5 @@ index d8246ac..2ff12e9 100644
  
  // Test RSA PKCS #1 encryption.
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 

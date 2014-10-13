@@ -1,4 +1,4 @@
-From 935818a8bac2c5f378da98f793086456bce7a638 Mon Sep 17 00:00:00 2001
+From a185d813f96f386d638dfa08de44cd91727c585b Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:05:04 +0100
 Subject: [PATCH 6/9] chaps: Return CKR_BUFFER_TOO_SMALL if a buffer was
@@ -8,13 +8,18 @@ As per PKCS#11 s11.2:
  - if the output buffer is NULL, the return code should be CKR_OK
  - if the output buffer is present but too small, the return code should be
    CKR_BUFFER_TOO_SMALL
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
+Change-Id: Ia5fe6101df5ca7861950600119f5ef1f5f66f509
 ---
  chaps/chaps.cc      |  2 +-
  chaps/chaps_test.cc | 18 ++++++++++++++++++
  2 files changed, 19 insertions(+), 1 deletion(-)
 
 diff --git a/chaps/chaps.cc b/chaps/chaps.cc
-index c94e03c..60abdf9 100644
+index c94e03cef679..60abdf9ea858 100644
 --- a/chaps/chaps.cc
 +++ b/chaps/chaps.cc
 @@ -76,7 +76,7 @@ static CK_RV HandlePKCS11Output(CK_RV result,
@@ -27,7 +32,7 @@ index c94e03c..60abdf9 100644
    }
    return result;
 diff --git a/chaps/chaps_test.cc b/chaps/chaps_test.cc
-index b307851..1d1761b 100644
+index b307851e8574..1d1761be082e 100644
 --- a/chaps/chaps_test.cc
 +++ b/chaps/chaps_test.cc
 @@ -1467,6 +1467,24 @@ TEST_F(TestEncrypt, EncryptFail) {
@@ -56,5 +61,5 @@ index b307851..1d1761b 100644
    ChapsProxyMock proxy(true);
    EXPECT_CALL(proxy, Encrypt(_, 1, data_in_, 0, _, _)).
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 

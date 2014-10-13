@@ -1,4 +1,4 @@
-From 0bf549e61a5ce47ff0e15604249981e931d8c308 Mon Sep 17 00:00:00 2001
+From 2b18df3e54ef1c565207dc71ed1f4878119cdb7c Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:08:33 +0100
 Subject: [PATCH 8/9] chaps: Prevent interspersal of incremental and one-shot
@@ -11,14 +11,19 @@ PKCS#11 spec has variants of the following (from C_Encrypt):
 
 So track whether a one-shot or multi-part operation has been started, and
 reject the other style if so.
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
+Change-Id: I484dca635a12246a30c461e6ea7113697e085d26
 ---
- chaps/session_impl.cc | 43 +++++++++++++++++++++++++++++++++++++++++--
- chaps/session_impl.h  |  8 ++++++++
- chaps/session_test.cc | 47 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+), 2 deletions(-)
+ chaps/session_impl.cc | 45 ++++++++++++++++++++++++++++++++++++++--
+ chaps/session_impl.h  |  9 ++++++++
+ chaps/session_test.cc | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 109 insertions(+), 2 deletions(-)
 
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
-index 76ee65f..09872ac 100644
+index 76ee65f985d2..6352f5e40897 100644
 --- a/chaps/session_impl.cc
 +++ b/chaps/session_impl.cc
 @@ -280,6 +280,23 @@ CK_RV SessionImpl::OperationUpdate(OperationType operation,
@@ -100,7 +105,7 @@ index 76ee65f..09872ac 100644
    key_ = NULL;
    data_.clear();
 diff --git a/chaps/session_impl.h b/chaps/session_impl.h
-index 37307ce..a725831 100644
+index 37307ce7efed..def9ee356f15 100644
 --- a/chaps/session_impl.h
 +++ b/chaps/session_impl.h
 @@ -111,6 +111,7 @@ class SessionImpl : public Session {
@@ -126,7 +131,7 @@ index 37307ce..a725831 100644
                     CK_MECHANISM_TYPE mechanism,
                     const std::string& mechanism_parameter,
 diff --git a/chaps/session_test.cc b/chaps/session_test.cc
-index 23015b6..d8246ac 100644
+index 23015b6df0c8..3a7e7842d984 100644
 --- a/chaps/session_test.cc
 +++ b/chaps/session_test.cc
 @@ -440,6 +440,53 @@ TEST_F(TestSession, HMAC) {
@@ -184,5 +189,5 @@ index 23015b6..d8246ac 100644
  TEST_F(TestSession, RSAEncrypt) {
    const Object* pub = NULL;
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 

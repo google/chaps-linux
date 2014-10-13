@@ -1,4 +1,4 @@
-From e44d86021114d5006acde6b06b95fce65df1e079 Mon Sep 17 00:00:00 2001
+From ce6815989d4c1047b94e096d112be51e66f2f49c Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:02:08 +0100
 Subject: [PATCH 4/9] chaps: Downgrade excessive logs
@@ -7,6 +7,11 @@ Respect the PAM_SILENT flag, and downgrade logs that occur in
 normal situations.  In particular, PAM sessions can be opened
 without a prior call to authenticate, leading to the user name
 being unavailable.
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
+Change-Id: Id617d091f34ef61dd454599dd61315f02f2cbbea
 ---
  chaps/chaps_pam_module.cc | 5 +++++
  chaps/chaps_proxy.cc      | 2 +-
@@ -15,7 +20,7 @@ being unavailable.
  4 files changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/chaps/chaps_pam_module.cc b/chaps/chaps_pam_module.cc
-index 073f377..ed6a125 100644
+index 073f37702fc6..ed6a125d0ec4 100644
 --- a/chaps/chaps_pam_module.cc
 +++ b/chaps/chaps_pam_module.cc
 @@ -102,6 +102,9 @@ static bool Init() {
@@ -38,7 +43,7 @@ index 073f377..ed6a125 100644
      return PAM_SERVICE_ERR;
  
 diff --git a/chaps/chaps_proxy.cc b/chaps/chaps_proxy.cc
-index 42163a3..f950234 100644
+index 42163a32c32c..f950234603fa 100644
 --- a/chaps/chaps_proxy.cc
 +++ b/chaps/chaps_proxy.cc
 @@ -38,7 +38,7 @@ bool ChapsProxyImpl::Init() {
@@ -51,7 +56,7 @@ index 42163a3..f950234 100644
      }
    } catch (DBus::Error err) {
 diff --git a/chaps/isolate_linux.cc b/chaps/isolate_linux.cc
-index 6be57c9..b1b9175 100644
+index 6be57c9bb165..b1b91750690d 100644
 --- a/chaps/isolate_linux.cc
 +++ b/chaps/isolate_linux.cc
 @@ -61,7 +61,7 @@ bool IsolateCredentialManager::GetUserIsolateCredential(
@@ -64,7 +69,7 @@ index 6be57c9..b1b9175 100644
    }
    const SecureBlob new_isolate_credential(credential_string);
 diff --git a/chaps/pam_helper.cc b/chaps/pam_helper.cc
-index fa19bd2..cac9d79 100644
+index fa19bd28e24f..cac9d790212a 100644
 --- a/chaps/pam_helper.cc
 +++ b/chaps/pam_helper.cc
 @@ -116,7 +116,7 @@ bool PamHelper::RetrieveUserAndPassword(pam_handle_t* pam_handle,
@@ -77,5 +82,5 @@ index fa19bd2..cac9d79 100644
    }
    *user = *reinterpret_cast<const string*>(user_data);
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 

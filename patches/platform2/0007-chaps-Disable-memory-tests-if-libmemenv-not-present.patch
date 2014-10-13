@@ -1,14 +1,18 @@
-From 5b3909076645505e28a3523746f4deb71fe8dc44 Mon Sep 17 00:00:00 2001
+From 102bf848d95fd3d03d92c3cecf7e6529dde69177 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:05:57 +0100
 Subject: [PATCH 7/9] chaps: Disable :memory: tests if libmemenv not present
 
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
+Change-Id: I163c73353c259106eaff6060bbd272dc1fbf167f
 ---
  chaps/object_store_test.cc | 2 ++
  1 file changed, 2 insertions(+)
 
 diff --git a/chaps/object_store_test.cc b/chaps/object_store_test.cc
-index 30aafdf..f5d1298 100644
+index 30aafdfd175c..f5d12985b0c8 100644
 --- a/chaps/object_store_test.cc
 +++ b/chaps/object_store_test.cc
 @@ -120,6 +120,7 @@ TEST_F(TestObjectStoreEncryption, CBCMode) {
@@ -28,5 +32,5 @@ index 30aafdf..f5d1298 100644
  }  // namespace chaps
  
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 

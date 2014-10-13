@@ -1,4 +1,4 @@
-From 7b72113898682ad4b97421031c472d5a473e7ca0 Mon Sep 17 00:00:00 2001
+From 73ad279094ae09ad5ea960aabd8e97fa7ec31cf5 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:00:19 +0100
 Subject: [PATCH 3/9] chaps: Reinstate org.chromium.Chaps.service file
@@ -6,6 +6,11 @@ Subject: [PATCH 3/9] chaps: Reinstate org.chromium.Chaps.service file
 This file is needed for the Linux build of Chaps.
 
 This reverts commit 6e8077189cbb ("Remove org.chromium.Chaps.service")
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
+Change-Id: I900df09cdb3b89846ff51ea310ef8b9af3d9404a
 ---
  chaps/org.chromium.Chaps.service | 4 ++++
  1 file changed, 4 insertions(+)
@@ -13,7 +18,7 @@ This reverts commit 6e8077189cbb ("Remove org.chromium.Chaps.service")
 
 diff --git a/chaps/org.chromium.Chaps.service b/chaps/org.chromium.Chaps.service
 new file mode 100644
-index 0000000..10cf47e
+index 000000000000..10cf47eab4b8
 --- /dev/null
 +++ b/chaps/org.chromium.Chaps.service
 @@ -0,0 +1,4 @@
@@ -22,5 +27,5 @@ index 0000000..10cf47e
 +Exec=/usr/sbin/chapsd
 +User=root
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
 
