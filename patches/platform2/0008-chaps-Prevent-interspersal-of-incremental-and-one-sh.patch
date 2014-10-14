@@ -1,4 +1,4 @@
-From 44f02ecb42fa9a81f2a06a9f4fb1a8dd666da92b Mon Sep 17 00:00:00 2001
+From 94098674a21d26c95295ccc0a16d4e9f57fafa26 Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Thu, 2 Oct 2014 12:08:33 +0100
 Subject: [PATCH 8/9] chaps: Prevent interspersal of incremental and one-shot
@@ -17,10 +17,10 @@ TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
 
 Change-Id: I484dca635a12246a30c461e6ea7113697e085d26
 ---
- chaps/session_impl.cc | 43 ++++++++++++++++++++++++++++++++++++--
+ chaps/session_impl.cc | 43 +++++++++++++++++++++++++++++++++++++--
  chaps/session_impl.h  |  8 ++++++++
- chaps/session_test.cc | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 106 insertions(+), 2 deletions(-)
+ chaps/session_test.cc | 56 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 105 insertions(+), 2 deletions(-)
 
 diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
 index 76ee65f985d2..033fe31504df 100644
@@ -131,16 +131,15 @@ index 37307ce7efed..a725831fa0f1 100644
                     CK_MECHANISM_TYPE mechanism,
                     const std::string& mechanism_parameter,
 diff --git a/chaps/session_test.cc b/chaps/session_test.cc
-index 23015b6df0c8..3a7e7842d984 100644
+index 23015b6df0c8..4a197b42416b 100644
 --- a/chaps/session_test.cc
 +++ b/chaps/session_test.cc
-@@ -440,6 +440,63 @@ TEST_F(TestSession, HMAC) {
+@@ -440,6 +440,62 @@ TEST_F(TestSession, HMAC) {
    EXPECT_EQ(CKR_OK, session_->VerifyFinal(out));
  }
  
 +// Test empty multi-part operation.
 +TEST_F(TestSession, FinalWithNoUpdate) {
-+  string in(30, 'A');
 +  EXPECT_EQ(CKR_OK, session_->OperationInit(kDigest, CKM_SHA_1, "", NULL));
 +  int len = 20;
 +  string out;
