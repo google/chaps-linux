@@ -1,0 +1,60 @@
+From 2fadf9b85aa7c6bc1f3a039b9b3809b760742c8d Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Tue, 14 Oct 2014 11:50:37 +0100
+Subject: [PATCH 10/10] Police invalid attribute length when setting
+ attributes.
+
+The value (CK_ULONG)-1 is used on C_GetAttributeValue to indicate
+an error for a particular attribute; as such, this value survives
+serialization (in attributes.cc).
+
+However, if an incorrect application turns around and uses this
+length value for an attribute on a call to C_SetAttributeValue,
+we need to ensure that this doesn't crash chapsd.
+
+In particular, watch out for this specific error value in
+ObjectImpl::SetAttributes(); other erroneously-huge values
+will only cause problems client-side (because the serialization
+will fail).
+---
+ chaps/object_impl.cc | 5 +++++
+ chaps/object_test.cc | 7 +++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/chaps/object_impl.cc b/chaps/object_impl.cc
+index 6454673..834b15e 100644
+--- a/chaps/object_impl.cc
++++ b/chaps/object_impl.cc
+@@ -114,6 +114,11 @@ CK_RV ObjectImpl::GetAttributes(CK_ATTRIBUTE_PTR attributes,
+ CK_RV ObjectImpl::SetAttributes(const CK_ATTRIBUTE_PTR attributes,
+                                 int num_attributes) {
+   for (int i = 0; i < num_attributes; ++i) {
++    // Watch out for -1 in the length; this survives serialization (because
++    // it is used as an error indicator for C_GetAttributeValue) but isn't
++    // valid when setting attributes.
++    if (attributes[i].ulValueLen == static_cast<CK_ULONG>(-1))
++      return CKR_ATTRIBUTE_VALUE_INVALID;
+     string value(reinterpret_cast<const char*>(attributes[i].pValue),
+                  attributes[i].ulValueLen);
+     if (policy_.get()) {
+diff --git a/chaps/object_test.cc b/chaps/object_test.cc
+index d70d8da..661634c 100644
+--- a/chaps/object_test.cc
++++ b/chaps/object_test.cc
+@@ -211,6 +211,13 @@ TEST_F(TestObject, SetAttributes) {
+   // Modify attributes successfully.
+   EXPECT_EQ(CKR_OK, object_->SetAttributes(templ, 1));
+   EXPECT_EQ(CKO_PUBLIC_KEY, object_->GetObjectClass());
++  // Attempt to set with invalid length; specifically, with the length value
++  // that is used to indicate an error on C_GetAttributeValue (so if an
++  // application re-used the CK_ATTRIBUTE template without checking/updating
++  // the length, this is what arrives).
++  CK_BYTE label[] = "label";
++  CK_ATTRIBUTE invalid[] = {{CKA_LABEL, &label, (CK_ULONG)-1}};
++  EXPECT_EQ(CKR_ATTRIBUTE_VALUE_INVALID, object_->SetAttributes(invalid, 1));
+ }
+ 
+ }  // namespace chaps
+-- 
+1.9.1
+
