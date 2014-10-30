@@ -1,0 +1,74 @@
+From 8b8eaa26444ae951805b6f3fd271b55960253694 Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 30 Oct 2014 10:56:28 +0000
+Subject: [PATCH] chaps: generate random bytes in software if TPM unavailable
+
+On creation of an isolate when a TPM is unavailable, need to generate
+random data without the assistance of the TPM.
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+---
+ chaps/slot_manager_impl.cc | 14 ++++++++++----
+ chaps/slot_manager_test.cc | 13 +++++++++++++
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/chaps/slot_manager_impl.cc b/chaps/slot_manager_impl.cc
+index 6cc52fb..d52de85 100644
+--- a/chaps/slot_manager_impl.cc
++++ b/chaps/slot_manager_impl.cc
+@@ -482,10 +482,16 @@ bool SlotManagerImpl::OpenIsolate(SecureBlob* isolate_credential,
+   } else {
+     VLOG(1) << "Creating new isolate.";
+     std::string credential_string;
+-    if (!tpm_utility_->GenerateRandom(kIsolateCredentialBytes,
+-                                      &credential_string)) {
+-      LOG(ERROR) << "Error generating random bytes for isolate credential";
+-      return false;
++    if (tpm_utility_->IsTPMAvailable()) {
++      if (!tpm_utility_->GenerateRandom(kIsolateCredentialBytes,
++                                        &credential_string)) {
++        LOG(ERROR) << "Error generating random bytes for isolate credential";
++        return false;
++      }
++    } else {
++      credential_string.resize(kIsolateCredentialBytes);
++      RAND_bytes(ConvertStringToByteBuffer(credential_string.data()),
++                 kIsolateCredentialBytes);
+     }
+     SecureBlob new_isolate_credential(credential_string);
+     ClearString(&credential_string);
+diff --git a/chaps/slot_manager_test.cc b/chaps/slot_manager_test.cc
+index c3e1384..7770b1b 100644
+--- a/chaps/slot_manager_test.cc
++++ b/chaps/slot_manager_test.cc
+@@ -527,6 +527,7 @@ class SoftwareOnlyTest : public TestSlotManager {
+         .WillRepeatedly(InvokeWithoutArgs(
+             this, &SoftwareOnlyTest::ObjectPoolFactory));
+     EXPECT_CALL(no_tpm_, IsTPMAvailable()).WillRepeatedly(Return(false));
++    EXPECT_CALL(no_tpm_, GenerateRandom(_, _)).WillRepeatedly(Return(false));
+     slot_manager_.reset(new SlotManagerImpl(&factory_, &no_tpm_, false));
+     ASSERT_TRUE(slot_manager_->Init());
+   }
+@@ -609,6 +610,18 @@ TEST_F(SoftwareOnlyTest, CreateNew) {
+   EXPECT_EQ(0, delete_all_num_calls_);
+ }
+ 
++TEST_F(SoftwareOnlyTest, TestOpenIsolate) {
++  // Check that trying to open an invalid isolate creates new isolate.
++  SecureBlob isolate("invalid");
++  bool new_isolate_created = false;
++  EXPECT_TRUE(slot_manager_->OpenIsolate(&isolate, &new_isolate_created));
++  EXPECT_TRUE(new_isolate_created);
++
++  // Check opening an existing isolate.
++  EXPECT_TRUE(slot_manager_->OpenIsolate(&isolate, &new_isolate_created));
++  EXPECT_FALSE(new_isolate_created);
++}
++
+ TEST_F(SoftwareOnlyTest, LoadExisting) {
+   InitializeObjectPoolBlobs();
+   int slot_id = 0;
+-- 
+1.9.1
+

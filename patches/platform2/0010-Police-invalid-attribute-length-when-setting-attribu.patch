@@ -1,8 +1,7 @@
 From 2fadf9b85aa7c6bc1f3a039b9b3809b760742c8d Mon Sep 17 00:00:00 2001
 From: David Drysdale <drysdale@google.com>
 Date: Tue, 14 Oct 2014 11:50:37 +0100
-Subject: [PATCH 10/10] Police invalid attribute length when setting
- attributes.
+Subject: [PATCH] chaps: Police invalid attribute length
 
 The value (CK_ULONG)-1 is used on C_GetAttributeValue to indicate
 an error for a particular attribute; as such, this value survives
@@ -16,6 +15,10 @@ In particular, watch out for this specific error value in
 ObjectImpl::SetAttributes(); other erroneously-huge values
 will only cause problems client-side (because the serialization
 will fail).
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+
 ---
  chaps/object_impl.cc | 5 +++++
  chaps/object_test.cc | 7 +++++++
