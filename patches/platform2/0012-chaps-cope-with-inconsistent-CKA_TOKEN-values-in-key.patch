@@ -1,0 +1,174 @@
+From 3436b4d82df019f18d8a8af18131daf8566d3279 Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Mon, 3 Nov 2014 14:12:53 +0000
+Subject: [PATCH] chaps: cope with inconsistent CKA_TOKEN values in keypair
+
+Allow the user to specify different values of CKA_TOKEN for
+the public and private parts of a keypair.
+
+(Previously, if the user tried this they would end up with an
+undeletable public key, because it would have the CKA_TOKEN
+attribute as false, but would be stored in the token pool
+anyway.)
+
+This also involves separating the numbering spaces used for
+handles in the fake token object pool and the fake session
+object pool.
+
+BUG=None
+TEST=Chaps unit tests (with ASAN) plus PKCS11 tests
+---
+ chaps/object_pool_mock.h            |  4 ++--
+ chaps/opencryptoki_importer_test.cc |  2 +-
+ chaps/session_impl.cc               | 13 ++++++-----
+ chaps/session_test.cc               | 46 +++++++++++++++++++++++++++++++++----
+ 4 files changed, 52 insertions(+), 13 deletions(-)
+
+diff --git a/chaps/object_pool_mock.h b/chaps/object_pool_mock.h
+index cb5b4eb..4998144 100644
+--- a/chaps/object_pool_mock.h
++++ b/chaps/object_pool_mock.h
+@@ -33,8 +33,8 @@ class ObjectPoolMock : public ObjectPool {
+   MOCK_METHOD2(FindByHandle, bool(int, const Object**));
+   MOCK_METHOD1(GetModifiableObject, Object*(const Object*));
+   MOCK_METHOD1(Flush, bool(const Object*));
+-  void SetupFake() {
+-    last_handle_ = 0;
++  void SetupFake(int handle_base) {
++    last_handle_ = handle_base;
+     ON_CALL(*this, Insert(testing::_))
+         .WillByDefault(testing::Invoke(this, &ObjectPoolMock::FakeInsert));
+     ON_CALL(*this, Import(testing::_))
+diff --git a/chaps/opencryptoki_importer_test.cc b/chaps/opencryptoki_importer_test.cc
+index 84a1576..e86688e 100644
+--- a/chaps/opencryptoki_importer_test.cc
++++ b/chaps/opencryptoki_importer_test.cc
+@@ -162,7 +162,7 @@ class TestImporterBase {
+         .WillRepeatedly(Invoke(CreateObjectMock));
+ 
+     // Set expectations for the object pool mock.
+-    pool_.SetupFake();
++    pool_.SetupFake(0);
+     EXPECT_CALL(pool_, Insert(_)).Times(AnyNumber());
+     EXPECT_CALL(pool_, Import(_)).Times(AnyNumber());
+     EXPECT_CALL(pool_, Find(_, _)).Times(AnyNumber());
+diff --git a/chaps/session_impl.cc b/chaps/session_impl.cc
+index cc5bc14..74032f0 100644
+--- a/chaps/session_impl.cc
++++ b/chaps/session_impl.cc
+@@ -577,7 +577,10 @@ CK_RV SessionImpl::GenerateKeyPair(CK_MECHANISM_TYPE mechanism,
+   int modulus_bits = public_object->GetAttributeInt(CKA_MODULUS_BITS, 0);
+   if (modulus_bits < kMinRSAKeyBits || modulus_bits > kMaxRSAKeyBitsSW)
+     return CKR_KEY_SIZE_RANGE;
+-  ObjectPool* pool = token_object_pool_;
++  ObjectPool* public_pool = (public_object->IsTokenObject() ?
++                             token_object_pool_ : session_object_pool_.get());
++  ObjectPool* private_pool = (private_object->IsTokenObject() ?
++                              token_object_pool_ : session_object_pool_.get());
+   // Check if we are able to back this key with the TPM.
+   if (tpm_utility_->IsTPMAvailable() &&
+       private_object->IsTokenObject() &&
+@@ -601,8 +604,6 @@ CK_RV SessionImpl::GenerateKeyPair(CK_MECHANISM_TYPE mechanism,
+     private_object->SetAttributeString(kAuthDataAttribute, auth_data);
+     private_object->SetAttributeString(kKeyBlobAttribute, key_blob);
+   } else {
+-    if (!private_object->IsTokenObject())
+-      pool = session_object_pool_.get();
+     if (!GenerateKeyPairSoftware(modulus_bits,
+                                  public_exponent,
+                                  public_object.get(),
+@@ -623,10 +624,10 @@ CK_RV SessionImpl::GenerateKeyPair(CK_MECHANISM_TYPE mechanism,
+   result = private_object->FinalizeNewObject();
+   if (result != CKR_OK)
+     return result;
+-  if (!pool->Insert(public_object.get()))
++  if (!public_pool->Insert(public_object.get()))
+     return CKR_FUNCTION_FAILED;
+-  if (!pool->Insert(private_object.get())) {
+-    pool->Delete(public_object.release());
++  if (!private_pool->Insert(private_object.get())) {
++    public_pool->Delete(public_object.release());
+     return CKR_FUNCTION_FAILED;
+   }
+   *new_public_key_handle = public_object.release()->handle();
+diff --git a/chaps/session_test.cc b/chaps/session_test.cc
+index 5fdc37c..9e4dd6d 100644
+--- a/chaps/session_test.cc
++++ b/chaps/session_test.cc
+@@ -35,8 +35,8 @@ using ::testing::StrictMock;
+ 
+ namespace {
+ 
+-void ConfigureObjectPool(chaps::ObjectPoolMock* op) {
+-  op->SetupFake();
++void ConfigureObjectPool(chaps::ObjectPoolMock* op, int handle_base) {
++  op->SetupFake(handle_base);
+   EXPECT_CALL(*op, Insert(_)).Times(AnyNumber());
+   EXPECT_CALL(*op, Find(_, _)).Times(AnyNumber());
+   EXPECT_CALL(*op, FindByHandle(_, _)).Times(AnyNumber());
+@@ -46,7 +46,7 @@ void ConfigureObjectPool(chaps::ObjectPoolMock* op) {
+ 
+ chaps::ObjectPool* CreateObjectPoolMock() {
+   chaps::ObjectPoolMock* op = new chaps::ObjectPoolMock();
+-  ConfigureObjectPool(op);
++  ConfigureObjectPool(op, 100);
+   return op;
+ }
+ 
+@@ -104,7 +104,7 @@ class TestSession: public ::testing::Test {
+         .WillRepeatedly(InvokeWithoutArgs(CreateObjectPoolMock));
+     EXPECT_CALL(handle_generator_, CreateHandle())
+         .WillRepeatedly(Return(1));
+-    ConfigureObjectPool(&token_pool_);
++    ConfigureObjectPool(&token_pool_, 0);
+     ConfigureTPMUtility(&tpm_);
+   }
+   void SetUp() {
+@@ -819,6 +819,44 @@ TEST_F(TestSession, GenerateRSAWithTPM) {
+   EXPECT_FALSE(object->IsAttributePresent(CKA_COEFFICIENT));
+ }
+ 
++TEST_F(TestSession, GenerateRSAWithTPMInconsistentToken) {
++  EXPECT_CALL(tpm_, GenerateKey(_, _, _, _, _, _)).WillOnce(Return(true));
++  EXPECT_CALL(tpm_, GetPublicKey(_, _, _)).WillRepeatedly(Return(true));
++
++  CK_BBOOL no = CK_FALSE;
++  CK_BBOOL yes = CK_TRUE;
++  CK_BYTE pubexp[] = {1, 0, 1};
++  int size = 2048;
++  CK_ATTRIBUTE pub_attr[] = {
++    {CKA_TOKEN, &no, sizeof(no)},
++    {CKA_ENCRYPT, &no, sizeof(no)},
++    {CKA_VERIFY, &yes, sizeof(yes)},
++    {CKA_PUBLIC_EXPONENT, pubexp, 3},
++    {CKA_MODULUS_BITS, &size, sizeof(size)}
++  };
++  CK_ATTRIBUTE priv_attr[] = {
++    {CKA_TOKEN, &yes, sizeof(yes)},
++    {CKA_DECRYPT, &no, sizeof(no)},
++    {CKA_SIGN, &yes, sizeof(yes)}
++  };
++  // Attempt to generate a private key on the token, but public key not on the
++  // token.
++  int pubh = 0, privh = 0;
++  ASSERT_EQ(CKR_OK, session_->GenerateKeyPair(CKM_RSA_PKCS_KEY_PAIR_GEN, "",
++                                              pub_attr, 5, priv_attr, 3,
++                                              &pubh, &privh));
++  const Object* public_object = NULL;
++  const Object* private_object = NULL;
++  ASSERT_TRUE(session_->GetObject(pubh, &public_object));
++  ASSERT_TRUE(session_->GetObject(privh, &private_object));
++  EXPECT_FALSE(public_object->IsTokenObject());
++  EXPECT_TRUE(private_object->IsTokenObject());
++
++  // Destroy the objects.
++  EXPECT_EQ(CKR_OK, session_->DestroyObject(pubh));
++  EXPECT_EQ(CKR_OK, session_->DestroyObject(privh));
++}
++
+ TEST_F(TestSession, GenerateRSAWithNoTPM) {
+   EXPECT_CALL(tpm_, IsTPMAvailable()).WillRepeatedly(Return(false));
+ 
+-- 
+1.9.1
+
