@@ -116,7 +116,7 @@ $(SRCDIR)/platform2/chaps/Makefile: | $(SRCDIR)/platform2
 	cd $(SRCDIR)/platform2 && echo "libchromeos/chromeos" >> .git/info/sparse-checkout
 	cd $(SRCDIR)/platform2 && echo "common-mk/common.mk" >> .git/info/sparse-checkout
 	cd $(SRCDIR)/platform2 && git pull origin master
-	cd $(SRCDIR)/platform2 && git am $(CURDIR)/patches/platform2/*.patch
+	-cd $(SRCDIR)/platform2 && git am $(CURDIR)/patches/platform2/*.patch
 
 
 # Copy man pages
