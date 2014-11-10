@@ -21,7 +21,6 @@ set -e
 case "$1" in
     configure|abort-upgrade|abort-remove|abort-deconfigure)
 	install -m 700 -d /var/lib/chaps/tokens/
-	install -m 700 -d /var/lib/chaps/tokens/system
 	install -m 755 -d /var/lib/chaps/isolates/
 	pam-auth-update --package
     ;;
