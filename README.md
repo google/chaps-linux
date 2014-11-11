@@ -141,9 +141,10 @@ will make any pre-existing TPM-backed cryptographic material inaccessible**:
  - The `tpm_takeownership` command performs the take-ownership operation, if required.  To use the TPM with Chaps,
    specify an empty SRK password, and whatever you like for the owner password.  (Note that an empty password is
    **different** than the `--well-known` option to this tool, which uses a 20-bytes-of-zero password.)
-     - (The Chaps daemon does allow for non-empty passwords with the `--srk_password` or `--srk_zeros` options to
-       `chapsd`, but these options are not currently exposed to the administrator; also, a non-empty SRK password would
-       prevent OpenCryptoKi from using the TPM.)
+     - If the SRK already has a non-empty password, Chaps can be configured to use this password with the
+       `--srk_password` or `--srk_zeros` options to `chapsd`.  However, these options are not currently exposed
+       externally (i.e. they cannot be configured in `/etc/default/chaps`), and a non-empty SRK password would
+       prevent current Debian versions of OpenCryptoKi from using the TPM.
 
 
 Troubleshooting
