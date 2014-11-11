@@ -4,7 +4,10 @@ Chaps: A PKCS #11 Implementation For Linux
 This repository is a framework for building and packaging the Chaps
 [PKCS #11](http://www.emc.com/emc-plus/rsa-labs/standards-initiatives/pkcs-11-cryptographic-token-interface-standard.htm)
 implementation from
-[ChromiumOS](http://www.chromium.org/developers/design-documents/chaps-technical-design) on Linux.
+[ChromiumOS](http://www.chromium.org/developers/design-documents/chaps-technical-design)
+on Linux.  Chaps provides an alternative to [OpenCryptoKi](http://sourceforge.net/projects/opencryptoki/)
+that has been [designed](http://www.chromium.org/developers/design-documents/chaps-technical-design#TOC-Rationale)
+to be faster and more maintainable.
 
 This repo does **not** hold the source code for Chaps; instead, the build files here retrieve the
 source code from the
@@ -20,15 +23,19 @@ This is NOT an official Google product.
 Installing Chaps
 ----------------
 
-To install Chaps on a Debian-based Linux system:
+To build and install Chaps on a Debian-based Linux system:
 
- - Install the prerequisites: `sudo apt-get install debhelper scons protobuf-compiler libdbus-1-dev libdbus-c++-dev
-   libprotobuf-dev libsnappy-dev libleveldb-dev libglib2.0-dev libctemplate-dev libssl-dev libtspi-dev libpam0g-dev`
- - Ensure that the TPM is initialized and accessible (see below).
- - Build a source tree (under `chaps-<version>`) with `make src_generate`
- - Build the packages with `make package`
- - Install the packages with `sudo dpkg -i chaps_*_amd64.deb libchaps0_*_amd64.deb`
- - Log out and in again, so that Chaps can create a per-user token.
+ - Build the Chaps packages:
+    - Install the prerequisites: `sudo apt-get install debhelper scons protobuf-compiler libdbus-1-dev libdbus-c++-dev
+      libprotobuf-dev libsnappy-dev libleveldb-dev libglib2.0-dev libctemplate-dev libssl-dev libtspi-dev libpam0g-dev`
+    - Ensure that the TPM is initialized and accessible (see below).
+    - Build a source tree (under `chaps-<version>`) with `make src_generate`
+    - Build the packages with `make package`
+ - Install the Chaps packages:
+    - Install the packages with `sudo dpkg -i chaps_*_amd64.deb libchaps0_*_amd64.deb`
+        - This needs some pre-requisite packages to be installed, notably [TrouSerS](http://trousers.sourceforge.net/)
+          (the key library that allows software access to the hardware TPM).
+    - Log out and in again, so that Chaps can create a per-user token.
 
 
 Package Configuration
@@ -129,11 +136,14 @@ will make any pre-existing TPM-backed cryptographic material inaccessible**:
  - The system also needs to have *taken ownership* of the TPM, which generates the *storage root key* (SRK) that will
    encrypt sensitive material.  This operation also involves setting two passwords:
      - The *SRK password* governs use of the storage root key, and so is needed for most TPM operations.
-     - The *owner password* governs authentication of the TPM itself; in particular, it is needed to change the SRK password.
+     - The *owner password* governs authentication of the TPM itself; in particular, it is needed to change the SRK
+       password.
  - The `tpm_takeownership` command performs the take-ownership operation, if required.  To use the TPM with Chaps,
    specify an empty SRK password, and whatever you like for the owner password.  (Note that an empty password is
    **different** than the `--well-known` option to this tool, which uses a 20-bytes-of-zero password.)
-
+     - (The Chaps daemon does allow for non-empty passwords with the `--srk_password` or `--srk_zeros` options to
+       `chapsd`, but these options are not currently exposed to the administrator; also, a non-empty SRK password would
+       prevent OpenCryptoKi from using the TPM.)
 
 
 Troubleshooting
