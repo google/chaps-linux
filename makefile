@@ -15,6 +15,9 @@ SRCDIR=$(CURDIR)/$(SRCDIR_REL)
 # Output from Chaps build.
 OUTDIR=$(SRCDIR)/out
 
+# Package signing options
+DPKGSIGN ?= -us -uc
+
 all: build
 
 
@@ -165,7 +168,7 @@ clean_dist:
 ######################################
 # Debian source package
 src-package: chaps_$(CHAPS_VERSION).orig.tar.gz
-	cd $(SRCDIR) && dpkg-buildpackage -us -uc -S
+	cd $(SRCDIR) && dpkg-buildpackage $(DPKGSIGN) -S
 chaps_$(CHAPS_VERSION).orig.tar.gz: $(SRC_TARBALL)
 	cp -f $< $@
 
@@ -174,7 +177,7 @@ chaps_$(CHAPS_VERSION).orig.tar.gz: $(SRC_TARBALL)
 # Debian binary package
 package: chaps_$(DEB_VERSION)_amd64.deb
 chaps_$(DEB_VERSION)_amd64.deb: src_generate
-	cd $(SRCDIR) && dpkg-buildpackage -us -uc -b
+	cd $(SRCDIR) && dpkg-buildpackage $(DPKGSIGN) -b
 clean_package:
 	rm -f chaps_$(DEB_VERSION)_amd64.deb
 
