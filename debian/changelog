@@ -1,11 +1,5 @@
-chaps (0.1-2) UNRELEASED; urgency=low
-
-  * Updated for latest upstream code
-
- -- David Drysdale <drysdale@google.com>  Mon, 15 Sep 2014 17:11:47 +0100
-
 chaps (0.1-1) unstable; urgency=low
 
-  * Initial release
+  * Initial public release, with latest upstream code
 
- -- Ross Mcilroy <rmcilroy@google.com>  Mon, 29 Apr 2013 11:27:47 +0100
+ -- David Drysdale <drysdale@google.com>  Thu, 11 Dec 2014 11:03:47 +0000
