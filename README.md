@@ -230,3 +230,36 @@ under `chaps-<version>/`.
  - `chaps-<version>/include`: Local include files
  - `chaps-<version>/debian`: Local Debian packaging files
  - `chaps-<version>/man`: man pages
+
+
+Versioning
+----------
+
+The Chaps source code tree is primarily built from two upstream repositories,
+ChromiumOS's [platform2](https://chromium.googlesource.com/chromiumos/platform2)
+repo together with the
+[base](https://chromium.googlesource.com/chromium/src/base) repo from Chromium.
+
+The platform2 code has branches named like `release-R42-6812.B` that correspond
+to CrOS releases, and the equivalent Debian package for Chaps will have version
+0.42-6812-<debian_revision>.
+
+To update Chaps so that it corresponds to a new CrOS release:
+ - Change the `CROS_VERSION` variable in `Makefile` to match the numeric part of
+   the CrOS release ID; for example, release-R42-6812.B gives
+   `CROS_VERSION=42-6812`
+ - Find the value of `BASE_VER` in `platform2/chaps/Makefile` (as of the
+   relevant CrOS branch for the release, e.g. `origin/release-R42-6812.B`).
+   This indicates the revision of the Chromium base repo that is expected.
+ - Update the `CHROMEBASE_VER` value in `Makefile` to match that value.
+ - Follow the instructions in `Makefile` to determine a commit ID for
+   the Chromium [base](https://chromium.googlesource.com/chromium/src/base) repo
+   that matches that `BASE_VER` revision.
+ - Update the `CHROMEBASE_COMMIT` value in `Makefile` to hold that commit ID.
+ - Update the `debian/changelog` file to include a stanza for the new version,
+   and describe the changes therein.
+ - Reset the `DEB_REVISION` value in `Makefile` to 1.
+ - Force a re-generation of the source tree with `make distclean`.
+
+If the upstream source remains the same, but there are local packaging changes
+or patches, then just the `DEB_REVISION` value in `Makefile` needs to be incremented.
