@@ -1,12 +1,14 @@
 # Version information
+CROS_VERSION=42-6812
+CROS_BRANCH=origin/release-R$(CROS_VERSION).B
 CHAPS_VERSION_MAJOR=0
-CHAPS_VERSION_MINOR=1
+CHAPS_VERSION_MINOR=$(CROS_VERSION)
 CHAPS_VERSION=$(CHAPS_VERSION_MAJOR).$(CHAPS_VERSION_MINOR)
-DEB_REVISION=2
+DEB_REVISION=1
 DEB_VERSION=$(CHAPS_VERSION)-$(DEB_REVISION)
 
 # The following should match platform2/chaps/Makefile $BASE_VER
-CHROMEBASE_VER=293518
+CHROMEBASE_VER=307740
 GMOCK_VERSION=1.7.0
 
 # Absolute location of the source tree
@@ -86,18 +88,19 @@ $(GMOCK_DIR)/LICENSE: | $(SRCDIR)
 CHROMEBASE_GIT=https://chromium.googlesource.com/chromium/src/base.git
 # The particular version of the Chromium base library required by platforms2/chaps
 # is indicated by the BASE_VER value in platform2/chaps/Makefile.
-#  - http://crrev/$BASE_VER returns a 302-redirect to the corresponding Git commit in
-#    the Chromium source code.  Call this SHA_A
-#  - However, this is a commit-ID in the master src.git repositiory, which is huge.
+#  - http://crrev.com/$BASE_VER returns a 302-redirect to the corresponding Git commit
+#    in the Chromium source code at https://chromium.googlesource.com/chromium/src.
+#    Call this SHA_A
+#  - However, this is a commit-ID in the master src.git repository, which is huge.
 #    We're only interested in code under base/, which gets pulled into a separate
 #    (smaller) Git repo base.git.
-#  - Running `git log -n 1 .. $SHA_A base/` in the full src.git repo gives the SHA1
-#    for the last commit that affected base/ and so should also be in base.git. Call
-#    this SHA_B.
-#  - Under base.git, running `git log --grep $SHA_B` gives the corresponding commit
-#    in the base.git tree.  Call this SHA_C.
+#  - Running `git log -n 1 ..$SHA_A base/` in the full src.git repo gives the SHA1
+#    for the last commit in src.git that affected base/ and so should also be present
+#    (as a copy) in base.git. Call this SHA_B.
+#  - Under base.git, running `git log --grep $SHA_B origin/master` gives the
+#    corresponding commit in the base.git tree.  Call this SHA_C.
 #  - This $SHA_C hash value from base.git is used here.
-CHROMEBASE_COMMIT=c683753f6613efa9a553ce4a9e2c159afbc9277e
+CHROMEBASE_COMMIT=2dfe404711e15e24e79799516400c61b2719d7af
 src_chromebase: $(SRCDIR)/base/base64.h
 $(SRCDIR)/base: | $(SRCDIR)
 	mkdir -p $@

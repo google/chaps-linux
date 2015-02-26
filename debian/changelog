@@ -1,5 +1,5 @@
-chaps (0.1-1) unstable; urgency=low
+chaps (0.42-6812-1) unstable; urgency=low
 
-  * Initial public release, with latest upstream code (closes: Bug#772818)
+  * Initial public release, with upstream code as of R42-6812 (closes: Bug#772818)
 
  -- David Drysdale <drysdale@google.com>  Thu, 11 Dec 2014 11:03:47 +0000

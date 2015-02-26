@@ -132,6 +132,7 @@ env['CCFLAGS'] += ['-fPIC',
                    '-isystem', '%s/include' % GTEST_DIR,
                    '-Iinclude',
                    '-I.']
+env['CXXFLAGS'] += ['-std=gnu++11']
 
 # Fix issue with scons not passing some vars through the environment.
 for key in Split('PKG_CONFIG SYSROOT'):
