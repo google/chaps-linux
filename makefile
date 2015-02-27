@@ -163,13 +163,13 @@ SRC_TARBALL=chaps-$(CHAPS_VERSION).tar.gz
 dist: $(SRC_TARBALL)
 
 $(SRC_TARBALL): src_generate clean
-	tar --exclude-vcs -czf $@ $(SRCDIR_REL)/base $(SRCDIR_REL)/platform2/chaps $(SRCDIR_REL)/platform2/libchromeos/chromeos $(SRCDIR_REL)/platform2/common-mk $(SRCDIR_REL)/include $(SRCDIR_REL)/gmock-$(GMOCK_VERSION) $(SRC_BUILDFILES) $(SRCDIR_REL)/man $(SRCDIR_REL)/debian
+	tar --exclude-vcs -czf $@ $(SRCDIR_REL)/base $(SRCDIR_REL)/platform2/chaps $(SRCDIR_REL)/platform2/libchromeos/chromeos $(SRCDIR_REL)/platform2/common-mk $(SRCDIR_REL)/include $(SRCDIR_REL)/gmock-$(GMOCK_VERSION) $(SRC_BUILDFILES) $(SRCDIR_REL)/man
 clean_dist:
 	rm -f $(SRC_TARBALL)
 
 
 ######################################
-# Debian source package
+# Debian source package: an .orig.tar.gz, a .dsc and a .debian.gz.
 src-package: chaps_$(CHAPS_VERSION).orig.tar.gz
 	cd $(SRCDIR) && dpkg-buildpackage $(DPKGSIGN) -S
 src_package: src-package
