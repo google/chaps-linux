@@ -40,7 +40,7 @@ out/libgmock.a: out/gmock-all.o
 test: out/libgtest.a out/libgmock.a libchrome-$(BASE_VER).a libchromeos-$(BASE_VER).a | out
 	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) LDLIBS="-L$(OUTDIR)" OUT=$(OUTDIR) $(MAKE) tests
 
-clean: clean_chaps clean_chromeos clean_chromebase clean_gmock
+clean: clean_chaps clean_chromeos clean_chromebase clean_gmock clean_debian
 clean_gmock:
 	rm -rf $(OUTDIR)/gtest-all.out $(OUTDIR)/libgtest.a
 	rm -rf $(OUTDIR)/gmock-all.out $(OUTDIR)/libgmock.a
@@ -51,6 +51,8 @@ clean_chromeos:
 clean_chaps:
 	-cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) $(MAKE) clean
 	rm -rf out
+clean_debian:
+	dh_clean
 
 
 distclean: clean

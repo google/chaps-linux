@@ -18,7 +18,7 @@ SRCDIR=$(CURDIR)/$(SRCDIR_REL)
 OUTDIR=$(SRCDIR)/out
 
 # Package signing options
-DPKGSIGN ?= -us -uc
+DPKGSIGN ?= --force-sign
 
 all: build
 
@@ -162,7 +162,7 @@ test: src_generate
 SRC_TARBALL=chaps-$(CHAPS_VERSION).tar.gz
 dist: $(SRC_TARBALL)
 
-$(SRC_TARBALL): src_generate
+$(SRC_TARBALL): src_generate clean
 	tar --exclude-vcs -czf $@ $(SRCDIR_REL)/base $(SRCDIR_REL)/platform2/chaps $(SRCDIR_REL)/platform2/libchromeos/chromeos $(SRCDIR_REL)/platform2/common-mk $(SRCDIR_REL)/include $(SRCDIR_REL)/gmock-$(GMOCK_VERSION) $(SRC_BUILDFILES) $(SRCDIR_REL)/man $(SRCDIR_REL)/debian
 clean_dist:
 	rm -f $(SRC_TARBALL)
@@ -172,17 +172,18 @@ clean_dist:
 # Debian source package
 src-package: chaps_$(CHAPS_VERSION).orig.tar.gz
 	cd $(SRCDIR) && dpkg-buildpackage $(DPKGSIGN) -S
+src_package: src-package
 chaps_$(CHAPS_VERSION).orig.tar.gz: $(SRC_TARBALL)
 	cp -f $< $@
 
 
 ######################################
-# Debian binary package
+# Debian binary packages
 package: chaps_$(DEB_VERSION)_amd64.deb
 chaps_$(DEB_VERSION)_amd64.deb: src_generate
 	cd $(SRCDIR) && dpkg-buildpackage $(DPKGSIGN) -b
 clean_package:
-	rm -f chaps_$(DEB_VERSION)_amd64.deb
+	rm -f chaps_$(DEB_VERSION)_amd64.deb libchaps0_$(DEB_VERSION)_amd64.deb
 
 
 ######################################
