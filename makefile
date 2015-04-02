@@ -20,8 +20,10 @@ OUTDIR=$(SRCDIR)/out
 # Package signing options
 DPKGSIGN ?= --force-sign
 
-all: build
+all: version-check build
 
+version-check: src_generate
+	@awk '/BASE_VER \?= / {if ($$3 != $(CHROMEBASE_VER)) {exit 1;}}' $(SRCDIR)/platform2/chaps/Makefile
 
 ######################################
 # Generate a source tree
