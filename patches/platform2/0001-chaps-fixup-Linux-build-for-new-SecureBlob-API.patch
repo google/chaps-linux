@@ -1,0 +1,54 @@
+From 1ce94299ca1138499910b4d29784b1cde0f1a751 Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Thu, 2 Apr 2015 14:33:58 +0100
+Subject: [PATCH] chaps: fixup Linux build for new SecureBlob API
+
+Commit 89f59bbe5df changed the interface for the SecureBlob class
+and updated most of the Chaps code, but some of the Linux-specific
+code was missed.
+
+BUG=None
+TEST=Chaps unit tests
+---
+ chaps/pam_helper.cc               | 3 ++-
+ chaps/token_file_manager_linux.cc | 4 ++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/chaps/pam_helper.cc b/chaps/pam_helper.cc
+index 0c27a78954da..11d86d807439 100644
+--- a/chaps/pam_helper.cc
++++ b/chaps/pam_helper.cc
+@@ -82,7 +82,8 @@ bool PamHelper::GetPamPassword(pam_handle_t* pam_handle,
+     return false;
+   }
+ 
+-  SecureBlob tmp(data_raw, strlen(data_raw));
++  string data_string(data_raw, strlen(data_raw));
++  SecureBlob tmp(data_string);
+   data->swap(tmp);
+ 
+   // Note: data_raw is the actual data, so should not be overwritten or freed.
+diff --git a/chaps/token_file_manager_linux.cc b/chaps/token_file_manager_linux.cc
+index 0e9f8bcfcf5e..00ba1c9c23c4 100644
+--- a/chaps/token_file_manager_linux.cc
++++ b/chaps/token_file_manager_linux.cc
+@@ -143,14 +143,14 @@ bool TokenFileManager::SaltAuthData(const FilePath& token_path,
+   }
+ 
+   SecureBlob out_key(kSaltedKeyBytes);
+-  if (1 != PKCS5_PBKDF2_HMAC(static_cast<const char *>(auth_data.data()),
++  if (1 != PKCS5_PBKDF2_HMAC(auth_data.char_data(),
+                              auth_data.size(),
+                              salt.data(),
+                              kSaltBytes,
+                              kSaltIterations,
+                              EVP_sha512(),
+                              kSaltedKeyBytes,
+-                             out_key.data()) {
++                             out_key.data())) {
+     LOG(ERROR) << "Could not salt authorization data.";
+     return false;
+   }
+-- 
+2.2.0.rc0.207.ga3a616c
+
