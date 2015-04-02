@@ -1,6 +1,6 @@
 # Version information
 CROS_VERSION=42-6812
-CROS_BRANCH=origin/release-R$(CROS_VERSION).B
+CROS_BRANCH=origin/master
 CHAPS_VERSION_MAJOR=0
 CHAPS_VERSION_MINOR=$(CROS_VERSION)
 CHAPS_VERSION=$(CHAPS_VERSION_MAJOR).$(CHAPS_VERSION_MINOR)
@@ -124,6 +124,7 @@ $(SRCDIR)/platform2/chaps/Makefile: | $(SRCDIR)/platform2
 	cd $(SRCDIR)/platform2 && echo "libchromeos/chromeos" >> .git/info/sparse-checkout
 	cd $(SRCDIR)/platform2 && echo "common-mk/common.mk" >> .git/info/sparse-checkout
 	cd $(SRCDIR)/platform2 && git pull origin master
+	cd $(SRCDIR)/platform2 && git checkout $(CROS_BRANCH)
 	-cd $(SRCDIR)/platform2 && git am $(CURDIR)/patches/platform2/*.patch
 
 
