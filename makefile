@@ -23,7 +23,7 @@ DPKGSIGN ?= --force-sign
 all: version-check build
 
 version-check: src_generate
-	@awk '/BASE_VER \?= / {if ($$3 != $(CHROMEBASE_VER)) {exit 1;}}' $(SRCDIR)/platform2/chaps/Makefile
+	@awk '/BASE_VER \?= / {if ($$3 != $(CHROMEBASE_VER)) {exit 1;}}' $(SRCDIR)/platform2/common-mk/common.mk
 
 ######################################
 # Generate a source tree
