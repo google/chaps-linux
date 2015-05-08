@@ -117,6 +117,7 @@ src_platform2: $(SRCDIR)/platform2/chaps/Makefile
 $(SRCDIR)/platform2:
 	mkdir -p $@
 PLATFORM2_GIT=https://chromium.googlesource.com/chromiumos/platform2
+PATCHES=$(wildcard $(CURDIR)/patches/platform2/*.patch)
 $(SRCDIR)/platform2/chaps/Makefile: | $(SRCDIR)/platform2
 	cd $(SRCDIR)/platform2 && git init . && git remote add -f origin $(PLATFORM2_GIT)
 	cd $(SRCDIR)/platform2 && git config core.sparsecheckout true
@@ -125,7 +126,7 @@ $(SRCDIR)/platform2/chaps/Makefile: | $(SRCDIR)/platform2
 	cd $(SRCDIR)/platform2 && echo "common-mk/common.mk" >> .git/info/sparse-checkout
 	cd $(SRCDIR)/platform2 && git pull origin master
 	cd $(SRCDIR)/platform2 && git checkout $(CROS_BRANCH)
-	-cd $(SRCDIR)/platform2 && git am $(CURDIR)/patches/platform2/*.patch
+	cd $(SRCDIR)/platform2 && if [ ! -z "$(PATCHES)" ]; then git am $(PATCHES); fi
 
 
 # Copy man pages
