@@ -1,5 +1,5 @@
 # Version information
-CROS_VERSION=42-6812
+CROS_VERSION=49-7834
 CROS_BRANCH=origin/master
 CHAPS_VERSION_MAJOR=0
 CHAPS_VERSION_MINOR=$(CROS_VERSION)
@@ -7,8 +7,8 @@ CHAPS_VERSION=$(CHAPS_VERSION_MAJOR).$(CHAPS_VERSION_MINOR)
 DEB_REVISION=1
 DEB_VERSION=$(CHAPS_VERSION)-$(DEB_REVISION)
 
-# The following should match platform2/chaps/Makefile $BASE_VER
-CHROMEBASE_VER=307740
+# The following should match platform2/common-mk/BASE_VER
+CHROMEBASE_VER=369476
 GMOCK_VERSION=1.7.0
 
 # Absolute location of the source tree
@@ -27,7 +27,7 @@ version-check: src_generate
 
 ######################################
 # Generate a source tree
-src_generate: src_includes src_makefiles src_gmock src_chromebase src_platform2 src_man src_debian
+src_generate: src_includes src_makefiles src_gmock src_chromebase src_libchromeos src_platform2 src_man src_debian
 $(SRCDIR):
 	mkdir -p $@
 
@@ -89,20 +89,20 @@ $(GMOCK_DIR)/LICENSE: | $(SRCDIR)
 # Chaps relies on utility code from Chromium base libraries, at:
 CHROMEBASE_GIT=https://chromium.googlesource.com/chromium/src/base.git
 # The particular version of the Chromium base library required by platforms2/chaps
-# is indicated by the BASE_VER value in platform2/chaps/Makefile.
+# is indicated by the BASE_VER value in platform2/common-mk/BASE_VER
 #  - http://crrev.com/$BASE_VER returns a 302-redirect to the corresponding Git commit
 #    in the Chromium source code at https://chromium.googlesource.com/chromium/src.
 #    Call this SHA_A
 #  - However, this is a commit-ID in the master src.git repository, which is huge.
 #    We're only interested in code under base/, which gets pulled into a separate
 #    (smaller) Git repo base.git.
-#  - Running `git log -n 1 ..$SHA_A base/` in the full src.git repo gives the SHA1
+#  - Running `git log -n 1 $SHA_A base/` in the full src.git repo gives the SHA1
 #    for the last commit in src.git that affected base/ and so should also be present
 #    (as a copy) in base.git. Call this SHA_B.
 #  - Under base.git, running `git log --grep $SHA_B origin/master` gives the
 #    corresponding commit in the base.git tree.  Call this SHA_C.
 #  - This $SHA_C hash value from base.git is used here.
-CHROMEBASE_COMMIT=2dfe404711e15e24e79799516400c61b2719d7af
+CHROMEBASE_COMMIT=e428d62b50cf091c19750cd742c5cead7b1f55c7
 src_chromebase: $(SRCDIR)/base/base64.h
 $(SRCDIR)/base: | $(SRCDIR)
 	mkdir -p $@
@@ -110,9 +110,18 @@ $(SRCDIR)/base/base64.h: | $(SRCDIR)/base
 	git clone $(CHROMEBASE_GIT) $(SRCDIR)/base
 	cd $(SRCDIR)/base && git checkout $(CHROMEBASE_COMMIT)
 
-# We need two subdirectories from the platform2 repository from ChromiumOS:
-#   - chaps/ for the Chaps source code
-#   - libchromeos/chromeos/ for various utilities that Chaps requires.
+# Chaps relies on utility code from libchromeos, at:
+LIBCHROMEOS_GIT=https://android.googlesource.com/platform/external/libchromeos
+# TODO(drysdale): figure out which commit/branch/tag of libchromeos goes with current code.
+LIBCHROMEOS_COMMIT=origin/master
+src_libchromeos: $(SRCDIR)/libchromeos/brillo/secure_blob.cc
+$(SRCDIR)/libchromeos: | $(SRCDIR)
+	mkdir -p $@
+$(SRCDIR)/libchromeos/brillo/secure_blob.cc: | $(SRCDIR)/libchromeos
+	git clone $(LIBCHROMEOS_GIT) $(SRCDIR)/libchromeos
+	cd $(SRCDIR)/libchromeos && git checkout $(LIBCHROMEOS_COMMIT)
+
+# We only need the chaps/ and common-mk/ subdirectories from the platform2 repository from ChromiumOS.
 src_platform2: $(SRCDIR)/platform2/chaps/Makefile
 $(SRCDIR)/platform2:
 	mkdir -p $@
@@ -122,8 +131,7 @@ $(SRCDIR)/platform2/chaps/Makefile: | $(SRCDIR)/platform2
 	cd $(SRCDIR)/platform2 && git init . && git remote add -f origin $(PLATFORM2_GIT)
 	cd $(SRCDIR)/platform2 && git config core.sparsecheckout true
 	cd $(SRCDIR)/platform2 && echo "chaps" > .git/info/sparse-checkout
-	cd $(SRCDIR)/platform2 && echo "libchromeos/chromeos" >> .git/info/sparse-checkout
-	cd $(SRCDIR)/platform2 && echo "common-mk/common.mk" >> .git/info/sparse-checkout
+	cd $(SRCDIR)/platform2 && echo "common-mk" >> .git/info/sparse-checkout
 	cd $(SRCDIR)/platform2 && git pull origin master
 	cd $(SRCDIR)/platform2 && git checkout $(CROS_BRANCH)
 	cd $(SRCDIR)/platform2 && if [ ! -z "$(PATCHES)" ]; then git am $(PATCHES); fi

@@ -13,7 +13,6 @@ base_name = 'base'
 base_lib = {
     'sources' : """
                 base/at_exit.cc
-                base/atomicops_internals_x86_gcc.cc
                 base/base_switches.cc
                 base/callback_internal.cc
                 base/command_line.cc
@@ -29,6 +28,7 @@ base_lib = {
                 base/files/file_path.cc
                 base/files/file_path_constants.cc
                 base/files/file_posix.cc
+                base/files/file_tracing.cc
                 base/files/file_util.cc
                 base/files/file_util_posix.cc
                 base/files/scoped_file.cc
@@ -41,6 +41,7 @@ base_lib = {
                 base/lazy_instance.cc
                 base/location.cc
                 base/logging.cc
+                base/md5.cc
                 base/memory/ref_counted.cc
                 base/memory/ref_counted_memory.cc
                 base/memory/singleton.cc
@@ -51,17 +52,18 @@ base_lib = {
                 base/metrics/histogram_base.cc
                 base/metrics/histogram_samples.cc
                 base/metrics/histogram.cc
+                base/metrics/metrics_hashes.cc
                 base/metrics/sample_map.cc
                 base/metrics/sample_vector.cc
                 base/metrics/sparse_histogram.cc
                 base/metrics/statistics_recorder.cc
                 base/pickle.cc
+                base/posix/safe_strerror.cc
                 base/process/process_handle_posix.cc
                 base/profiler/alternate_timer.cc
                 base/profiler/tracked_time.cc
                 base/rand_util.cc
                 base/rand_util_posix.cc
-                base/safe_strerror_posix.cc
                 base/strings/string16.cc
                 base/strings/string_piece.cc
                 base/strings/stringprintf.cc
@@ -77,6 +79,11 @@ base_lib = {
                 base/synchronization/lock_impl_posix.cc
                 base/synchronization/waitable_event_posix.cc
                 base/sys_info_posix.cc
+                base/test/test_file_util.cc
+                base/test/test_file_util_linux.cc
+                base/test/test_file_util_posix.cc
+                base/test/test_switches.cc
+                base/test/test_timeouts.cc
                 base/third_party/dmg_fp/dtoa.cc
                 base/third_party/dmg_fp/g_fmt.cc
                 base/third_party/dynamic_annotations/dynamic_annotations.c
@@ -84,6 +91,7 @@ base_lib = {
                 base/third_party/nspr/prtime.cc
                 base/threading/non_thread_safe_impl.cc
                 base/threading/platform_thread_linux.cc
+                base/threading/platform_thread_internal_posix.cc
                 base/threading/platform_thread_posix.cc
                 base/threading/thread_id_name_manager.cc
                 base/threading/thread_checker_impl.cc
@@ -94,6 +102,7 @@ base_lib = {
                 base/threading/thread_restrictions.cc
                 base/time/time.cc
                 base/time/time_posix.cc
+                base/timer/elapsed_timer.cc
                 base/tracked_objects.cc
                 base/strings/utf_string_conversions.cc
                 base/values.cc
