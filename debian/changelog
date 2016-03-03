@@ -1,3 +1,10 @@
+chaps (0.49-7834-1) unstable; urgency=low
+
+  * Update for current Chrome[OS] code.
+
+ -- David Drysdale <drysdale@google.com>  Wed, 10 Feb 2016 17:12:10 +0000
+
+
 chaps (0.42-6812-1) unstable; urgency=low
 
   * Initial public release, with upstream code as of
