@@ -10,11 +10,12 @@ OUTDIR=$(SRCDIR)/out
 GMOCK_DIR=$(SRCDIR)/gmock-$(GMOCK_VER)
 GTEST_DIR=$(GMOCK_DIR)/gtest
 
-INCLUDES="-I$(SRCDIR)/include -I$(SRCDIR)/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include"
+INCLUDES=-I$(SRCDIR)/include -I$(SRCDIR)/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include
+CXXFLAGS+=$(INCLUDES)
 
 # To build Chaps, defer to platform2/chaps/Makefile
 all: libchrome-$(BASE_VER).a libbrillo-$(BASE_VER).a | out
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) CHAPS_VERSION_MAJOR=$(CHAPS_VERSION_MAJOR) CHAPS_VERSION_MINOR=$(CHAPS_VERSION_MINOR) $(MAKE)
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="$(CXXFLAGS)" OUT=$(OUTDIR) CHAPS_VERSION_MAJOR=$(CHAPS_VERSION_MAJOR) CHAPS_VERSION_MINOR=$(CHAPS_VERSION_MINOR) $(MAKE)
 
 # To build required Chromium components, defer to scons file.
 libchrome-$(BASE_VER).a:
@@ -38,7 +39,7 @@ out/libgmock.a: out/gmock-all.o
 	ar -rv $@ $<
 
 test: out/libgtest.a out/libgmock.a libchrome-$(BASE_VER).a libbrillo-$(BASE_VER).a | out
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) LDLIBS="-L$(OUTDIR)" OUT=$(OUTDIR) $(MAKE) tests
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="$(CXXFLAGS)" LDLIBS="-L$(OUTDIR)" OUT=$(OUTDIR) $(MAKE) tests
 
 clean: clean_chaps clean_chromeos clean_chromebase clean_gmock clean_debian
 clean_gmock:
@@ -64,4 +65,4 @@ install_man:
 	$(INSTALL) -m 0644 -D man/chapsd.8 $(MANDIR)/man8/chapsd.8
 	$(INSTALL) -m 0644 -D man/chaps_client.8 $(MANDIR)/man8/chaps_client.8
 install: install_man
-	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) CHAPS_VERSION_MAJOR=$(CHAPS_VERSION_MAJOR) CHAPS_VERSION_MINOR=$(CHAPS_VERSION_MINOR) $(MAKE) install_files
+	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS="$(CXXFLAGS)" OUT=$(OUTDIR) CHAPS_VERSION_MAJOR=$(CHAPS_VERSION_MAJOR) CHAPS_VERSION_MINOR=$(CHAPS_VERSION_MINOR) $(MAKE) install_files
