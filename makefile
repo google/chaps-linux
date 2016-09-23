@@ -9,7 +9,7 @@ DEB_VERSION=$(CHAPS_VERSION)-$(DEB_REVISION)
 
 # The following should match platform2/common-mk/BASE_VER
 CHROMEBASE_VER=369476
-GMOCK_VERSION=1.7.0
+GMOCK_VERSION=1.8.0
 
 # Absolute location of the source tree
 SRCDIR_REL=chaps-$(CHAPS_VERSION)
@@ -75,14 +75,14 @@ $(SRCDIR_REL)/Sconstruct.libchromeos: extrasrc/Sconstruct.libchromeos | $(SRCDIR
 
 # Various parts of Chromium include gTest files.  To ensure consistency, get a local
 # copy of gMock and gTest (rather than picking up whatever version is installed).
-GMOCK_URL=https://googlemock.googlecode.com/files/gmock-$(GMOCK_VERSION).zip
-GMOCK_DIR=$(SRCDIR)/gmock-$(GMOCK_VERSION)
-GTEST_DIR=$(GMOCK_DIR)/gtest
+GMOCK_URL=https://github.com/google/googletest/archive/release-$(GMOCK_VERSION).zip
+GMOCK_DIR=$(SRCDIR)/googletest-release-$(GMOCK_VERSION)/googlemock
+GTEST_DIR=$(SRCDIR)/googletest-release-$(GMOCK_VERSION)/googletest
 src_gmock: $(GMOCK_DIR)/LICENSE
 $(GMOCK_DIR)/LICENSE: | $(SRCDIR)
 	cd $(SRCDIR) && wget $(GMOCK_URL)
-	cd $(SRCDIR) && unzip -q gmock-$(GMOCK_VERSION).zip
-	rm $(SRCDIR)/gmock-$(GMOCK_VERSION).zip
+	cd $(SRCDIR) && unzip -q release-$(GMOCK_VERSION).zip
+	rm $(SRCDIR)/release-$(GMOCK_VERSION).zip
 	touch $@
 
 

@@ -7,8 +7,8 @@ CHAPS_VERSION=$(CHAPS_VERSION_MAJOR).$(CHAPS_VERSION_MINOR)
 
 SRCDIR=$(CURDIR)
 OUTDIR=$(SRCDIR)/out
-GMOCK_DIR=$(SRCDIR)/gmock-$(GMOCK_VER)
-GTEST_DIR=$(GMOCK_DIR)/gtest
+GMOCK_DIR=$(SRCDIR)/googletest-release-$(GMOCK_VER)/googlemock
+GTEST_DIR=$(SRCDIR)/googletest-release-$(GMOCK_VER)/googletest
 
 INCLUDES="-I$(SRCDIR)/include -I$(SRCDIR)/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include"
 

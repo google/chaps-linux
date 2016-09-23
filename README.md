@@ -226,7 +226,7 @@ under `chaps-<version>/`.
    [https://chromium.googlesource.com/chromium/src/base](https://chromium.googlesource.com/chromium/src/base)
  - `chaps-<version>/platform2`: ChromiumOS core code, including Chaps and utility libraries required by Chaps, from
    [https://chromium.googlesource.com/chromiumos/platform2](https://chromium.googlesource.com/chromiumos/platform2)
- - `chaps-<version>/gmock-<gmock-version>`: GoogleMock and GoogleTest code
+ - `chaps-<version>/googletest-release-<version>`: GoogleMock and GoogleTest code
  - `chaps-<version>/include`: Local include files
  - `chaps-<version>/debian`: Local Debian packaging files
  - `chaps-<version>/man`: man pages
