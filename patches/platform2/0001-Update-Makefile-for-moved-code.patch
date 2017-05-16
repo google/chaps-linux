@@ -1,0 +1,96 @@
+From 0f6cf6a8ef654d2968822c21019ec97b44fe7507 Mon Sep 17 00:00:00 2001
+From: David Drysdale <drysdale@google.com>
+Date: Tue, 16 May 2017 13:09:52 +0100
+Subject: [PATCH] Update Makefile for moved code
+
+---
+ chaps/Makefile | 24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
+
+diff --git a/chaps/Makefile b/chaps/Makefile
+index 494c52122c9e..6477fba9c1b9 100644
+--- a/chaps/Makefile
++++ b/chaps/Makefile
+@@ -58,25 +58,25 @@ DBUS_ADAPTORS_DIR = $(OUT)/chaps/dbus_adaptors
+ DBUS_PROXIES_DIR = $(OUT)/chaps/dbus_proxies
+ 
+ # Rules for Generated Code
+-$(DBUS_PROXIES_DIR)/chaps_interface.h: $(SRC)/chaps_interface.xml
++$(DBUS_PROXIES_DIR)/org.chromium.Chaps.h: $(SRC)/dbus_bindings/org.chromium.Chaps.xml
+ 	mkdir -p $(DBUS_PROXIES_DIR)
+ 	$(DBUSXX_XML2CPP) $< --proxy=$@
+-clean: CLEAN($(DBUS_PROXIES_DIR)/chaps_interface.h)
++clean: CLEAN($(DBUS_PROXIES_DIR)/org.chromium.Chaps.h)
+ 
+ chaps_client.o.depends \
+ chaps_proxy.o.depends \
+ chapsd_test.o.depends \
+ chaps.o.depends \
+ chaps_event_generator.o.depends \
+-token_manager_client.o.depends: $(DBUS_PROXIES_DIR)/chaps_interface.h
++token_manager_client.o.depends: $(DBUS_PROXIES_DIR)/org.chromium.Chaps.h
+ 
+-$(DBUS_ADAPTORS_DIR)/chaps_interface.h: $(SRC)/chaps_interface.xml
++$(DBUS_ADAPTORS_DIR)/org.chromium.Chaps.h: $(SRC)/dbus_bindings/org.chromium.Chaps.xml
+ 	mkdir -p $(DBUS_ADAPTORS_DIR)
+ 	$(DBUSXX_XML2CPP) $< --adaptor=$@
+-clean: CLEAN($(DBUS_ADAPTORS_DIR)/chaps_interface.h)
++clean: CLEAN($(DBUS_ADAPTORS_DIR)/org.chromium.Chaps.h)
+ 
+ chaps_adaptor.o.depends \
+-chapsd.o.depends : $(DBUS_ADAPTORS_DIR)/chaps_interface.h
++chapsd.o.depends : $(DBUS_ADAPTORS_DIR)/org.chromium.Chaps.h
+ 
+ PROTO_DIR = $(OUT)/chaps/proto_bindings
+ 
+@@ -91,8 +91,11 @@ object_pool_impl.o.depends \
+ object_pool_test.o.depends \
+ attributes.o.depends: $(PROTO_DIR)/attributes.pb.h
+ 
++$(eval $(call add_object_rules,$(PROTO_DIR)/ck_structs.pb.o,CXX,cc,CXXFLAGS))
++
++
+ # Common Files
+-COMMON_OBJS = chaps_utility.o $(PROTO_DIR)/attributes.pb.o attributes.o
++COMMON_OBJS = chaps_utility.o $(PROTO_DIR)/attributes.pb.o attributes.o $(PROTO_DIR)/ck_structs.pb.o
+ 
+ # Chaps Daemon
+ chapsd_OBJS = $(COMMON_OBJS) \
+@@ -113,6 +116,7 @@ chapsd_OBJS = $(COMMON_OBJS) \
+               object_policy_secret_key.o \
+               object_pool_impl.o \
+               platform_globals_$(PLATFORM).o \
++              proto_conversion.o \
+               tpm_utility_impl.o \
+               chaps_factory_impl.o \
+               object_store_impl.o \
+@@ -144,7 +148,7 @@ clean: CLEAN($(OUT)/org.chromium.Chaps.conf)
+ 
+ # Chaps Client Library
+ libchaps_OBJS = $(COMMON_OBJS) chaps.o chaps_proxy.o token_manager_client.o \
+-                isolate_$(PLATFORM).o
++                isolate_$(PLATFORM).o proto_conversion.o
+ CXX_LIBRARY(libchaps.so): $(libchaps_OBJS)
+ clean: CLEAN(libchaps.so)
+ all: CXX_LIBRARY(libchaps.so)
+@@ -168,7 +172,7 @@ clean: CLEAN(chaps_client)
+ all: CXX_BINARY(chaps_client)
+ 
+ # PKCS #11 Replay Utility
+-p11_replay_OBJS = p11_replay.o
++p11_replay_OBJS = p11_replay.o $(PROTO_DIR)/ck_structs.pb.o
+ CXX_BINARY(p11_replay): $(p11_replay_OBJS) CXX_LIBRARY(libchaps.so)
+ clean: CLEAN(p11_replay)
+ all: CXX_BINARY(p11_replay)
+@@ -260,7 +264,7 @@ tests: TEST(CXX_BINARY(chaps_test))
+ 
+ chaps_service_test_OBJS = $(COMMON_OBJS) $(MOCK_OBJS) \
+                           chaps_service_test.o chaps_service.o \
+-                          isolate_$(PLATFORM).o
++                          isolate_$(PLATFORM).o proto_conversion.o
+ chaps_service_test_LIBS = $(GMOCK_LIBS)
+ CXX_BINARY(chaps_service_test): $(chaps_service_test_OBJS)
+ CXX_BINARY(chaps_service_test): LDLIBS += $(chaps_service_test_LIBS)
+-- 
+2.13.0.303.g4ebf302169-goog
+

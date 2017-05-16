@@ -13,7 +13,7 @@ GTEST_DIR=$(SRCDIR)/googletest-release-$(GMOCK_VER)/googletest
 INCLUDES="-I$(SRCDIR)/include -I$(SRCDIR)/libchromeos -isystem $(GTEST_DIR)/include -I$(GMOCK_DIR)/include -I$(SRCDIR)/leveldb/include"
 
 # To build Chaps, defer to platform2/chaps/Makefile
-all: libchrome-$(BASE_VER).a libbrillo-$(BASE_VER).a | out
+all: libchrome-$(BASE_VER).a libbrillo-$(BASE_VER).a pb_files | out
 	cd platform2/chaps && BASE_VER=$(BASE_VER) LINUX_BUILD=1 PKG_CONFIG_PATH=$(SRCDIR) CXXFLAGS=$(INCLUDES) OUT=$(OUTDIR) CHAPS_VERSION_MAJOR=$(CHAPS_VERSION_MAJOR) CHAPS_VERSION_MINOR=$(CHAPS_VERSION_MINOR) $(MAKE)
 
 # To build required Chromium components, defer to scons file.
@@ -24,7 +24,14 @@ libchrome-$(BASE_VER).a:
 libbrillo-$(BASE_VER).a:
 	BASE_VER=$(BASE_VER) scons -f Sconstruct.libchromeos
 
+# Build generated files from .proto file
+pb_files: out/chaps/proto_bindings/ck_structs.pb.h
+out/chaps/proto_bindings/ck_structs.pb.h: system_api/dbus/chaps/ck_structs.proto | out/chaps/proto_bindings
+	cd system_api/dbus/chaps && protoc --cpp_out=../../../out/chaps/proto_bindings ck_structs.proto
+
 out:
+	mkdir -p $@
+out/chaps/proto_bindings: | out
 	mkdir -p $@
 
 

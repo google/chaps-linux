@@ -27,7 +27,7 @@ version-check: src_generate
 
 ######################################
 # Generate a source tree
-src_generate: src_includes src_makefiles src_gmock src_chromebase src_libchromeos src_platform2 src_man src_debian
+src_generate: src_includes src_makefiles src_gmock src_chromebase src_libchromeos src_systemapi src_platform2 src_man src_debian
 $(SRCDIR):
 	mkdir -p $@
 
@@ -121,7 +121,17 @@ $(SRCDIR)/libchromeos/brillo/secure_blob.cc: | $(SRCDIR)/libchromeos
 	git clone $(LIBCHROMEOS_GIT) $(SRCDIR)/libchromeos
 	cd $(SRCDIR)/libchromeos && git checkout $(LIBCHROMEOS_COMMIT)
 
-# We only need the chaps/ and common-mk/ subdirectories from the platform2 repository from ChromiumOS.
+# Chaps relies on .proto files from the Chromium/ChromiumOS system API at:
+SYSTEMAPI_GIT=https://chromium.googlesource.com/chromiumos/platform/system_api.git
+SYSTEMAPI_COMMIT=master
+src_systemapi: $(SRCDIR)/system_api/dbus/chaps/ck_structs.proto
+$(SRCDIR)/system_api: | $(SRCDIR)
+	mkdir -p $@
+$(SRCDIR)/system_api/dbus/chaps/ck_structs.proto: | $(SRCDIR)/system_api
+	git clone $(SYSTEMAPI_GIT) $(SRCDIR)/system_api
+	cd $(SRCDIR)/system_api && git checkout $(SYSTEMAPI_COMMIT)
+
+# We only need the chaps/, dbus/ and common-mk/ subdirectories from the platform2 repository from ChromiumOS.
 src_platform2: $(SRCDIR)/platform2/chaps/Makefile
 $(SRCDIR)/platform2:
 	mkdir -p $@
