@@ -1,6 +1,8 @@
 Chaps: A PKCS #11 Implementation For Linux
 ==========================================
 
+**NOTE: As of ~May 2017 this repository is unmaintained and does not build**
+
 This repository is a framework for building and packaging the Chaps
 [PKCS #11](http://www.emc.com/emc-plus/rsa-labs/standards-initiatives/pkcs-11-cryptographic-token-interface-standard.htm)
 implementation from
